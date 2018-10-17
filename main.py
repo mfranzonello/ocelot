@@ -3,7 +3,7 @@ from sorting import *
 from inputs import *
 import sys
 
-print('*** OCELOT V2.0 ***\n')
+print('*** OCELOT V2.2 ***\n')
 start_time = timer()
 
 # assemble folders
@@ -62,14 +62,13 @@ pattern = Pattern()
 corners = pattern.generate_pattern(hsv=True,hues=True,account_for_angle=True)
 grid = reseed_grid(grid,corners,folder=out_path,name=grid_name,extension=grid_extension,secondary_scale=secondary_scale,display=display)
 taut_1 = grid.get_tautness()
-strength_0 = Grid.strength_value(taut_0,grid.size)
-strength_1 = Grid.strength_value(taut_1,grid.size)
-strengthening = strength_1/strength_0
-print(' ...{:0.2%} to {:0.2%} strength ({:+0.1f}x improvement)'.format(strength_0,strength_1,strengthening))
+
+print(' ...{:0.2%} to {:0.2%} strength'.format(taut_0,taut_1))
 
 # improve assembly
 print('\nOptimizing grid...')
-grid,n = swap_worst(grid,trials,1,folder=out_path,name=grid_name,extension=grid_extension,print_after=print_after,secondary_scale=secondary_scale,display=display)
+grid,n = swap_worst(grid,n_trials=trials,threshold=0.0,folder=out_path,name=grid_name,
+                    extension=grid_extension,print_after=print_after,secondary_scale=secondary_scale,display=display)
 
 taut_2 = grid.get_tautness()
 
@@ -87,8 +86,8 @@ open_folder(project_path)
 # summarize results
 end_time = timer(start_time)
 print('Ran {} optimizations'.format(n))
-print('Initial strength: {:0.2%}'.format(Grid.strength_value(taut_0,grid.size)))
-print('Reseed strength: {:0.2%}'.format(Grid.strength_value(taut_1,grid.size)))
-print('Final strength: {:0.2%}'.format(Grid.strength_value(taut_2,grid.size)))
+print('Initial strength: {:0.2%}'.format(taut_0))
+print('Reseed strength: {:0.2%}'.format(taut_1))
+print('Final strength: {:0.2%}'.format(taut_2))
 print('Elapsed time: {} min {} sec'.format(int(end_time[1]/60),round(end_time[1]%60)))
 

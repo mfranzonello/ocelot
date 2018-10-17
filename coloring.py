@@ -6,17 +6,24 @@ import colorsys
 
 class Rainbow:
     # listing of colors and their RGB values
-    def __init__(self):
-        self.hues = ['red','yellow','green','cyan','blue','magenta']
-        self.greys = ['black','white']
-        self.codes = ['R','Y','G','C','B','M','K','W']
-        self.rgbs = [(1,0,0),(1,1,0),(0,1,0),(0,1,1),(0,0,1),(1,0,1),(0,0,0),(1,1,1)]
-        self.primaries = dict(zip(self.hues+self.greys,self.rgbs))
-        self.code_names = dict(zip(self.codes,self.hues+self.greys))
+    hues = ['red','yellow','green','cyan','blue','magenta']
+    greys = ['black','white']
+    codes = ['R','Y','G','C','B','M','K','W']
+    RED = (1,0,0)
+    GREEN = (0,1,0)
+    BLUE = (0,0,1)
+    YELLOW = (1,1,0)
+    MAGENTA = (1,0,1)
+    CYAN = (0,1,1)
+    BLACK = (0,0,0)
+    WHITE = (1,1,1)
+    rgbs = [RED,YELLOW,GREEN,CYAN,BLUE,MAGENTA,BLACK,WHITE]
+    primaries = dict(zip(hues+greys,rgbs))
+    code_names = dict(zip(codes,hues+greys))
 
-    def get_rgb(self,color_name,scaled=True):
+    def get_rgb(color_name,scaled=True):
         # return the RGB tuple of a color based on common name or initial
-        rgb = self.primaries.get(color_name.lower(),self.primaries.get(color_name.upper()))
+        rgb = Rainbow.primaries.get(color_name.lower(),Rainbow.primaries.get(color_name.upper()))
         if not scaled:
             rgb = tuple(r*255 for r in rgb)
         return rgb
@@ -55,8 +62,10 @@ class Color:
         blue = int(round(self.blue/threshold)*threshold)
         return red,green,blue
 
-    def difference(self,color,method='rgb',r_weight=2,g_weight=4,b_weight=3,r_add_weight=128,coeff=0.005):
+    def difference(self,color,method='rgb',r_weight=2,g_weight=4,b_weight=3,r_add_weight=128,coeff=0.005,scaled=True):
         # find the distance between two colors
+
+        max_delta = 255
 
         # use euclidian RGB
         if method=='rgb':
@@ -69,7 +78,10 @@ class Color:
                                  g_weight*g_delta**2 + 
                                  b_weight*b_delta**2)# + 
                                  #r_add_weight*r_add*(r_delta**2-b_delta**2))
-        
+
+            if scaled:
+                distance /= math.sqrt(r_weight*max_delta**2 + g_weight*max_delta**2 + b_weight*max_delta**2)
+
         # use HSV distance
         elif method=='hsv':
             h1,s1,v1 = self.hsv
@@ -84,55 +96,52 @@ class Color:
         # find primary color using HSV
         h,s,v = self.hsv
 
-        rainbow = Rainbow()
-
         if v < value_threshold*255:
             primary = 'black'
         elif s < saturation_threshold:
             primary = 'white'
         else:
-            primary = rainbow.hues[round(h*len(rainbow.hues))%len(rainbow.hues)]
+            primary = Rainbow.hues[round(h*len(Rainbow.hues))%len(Rainbow.hues)]
 
-        primary_color = rainbow.get_rgb(primary)
+        primary_color = Rainbow.get_rgb(primary)
 
         return primary_color
 
 class Pattern:
     # pattern order for RMBCGY+WK seeding
     def __init__(self):
-        rainbow = Rainbow()
-        self.patterns = [{rainbow.get_rgb('R'):(0.00,0.00),
-                          rainbow.get_rgb('G'):(1.00,1.00),
-                          rainbow.get_rgb('B'):(1.00,0.00),
-                          rainbow.get_rgb('Y'):(0.50,0.50),
-                          rainbow.get_rgb('M'):(0.50,0.00),
-                          rainbow.get_rgb('C'):(1.00,0.50),
-                          rainbow.get_rgb('K'):(0.00,0.75),
-                          rainbow.get_rgb('W'):(0.25,1.00)},
-                         {rainbow.get_rgb('G'):(0.50,1.00),
-                          rainbow.get_rgb('R'):(0.00,0.00),
-                          rainbow.get_rgb('B'):(0.50,0.50),
-                          rainbow.get_rgb('Y'):(0.00,0.75),
-                          rainbow.get_rgb('M'):(0.50,0.00),
-                          rainbow.get_rgb('C'):(1.00,0.50),
-                          rainbow.get_rgb('K'):(1.00,0.00),
-                          rainbow.get_rgb('W'):(1.00,1.00)},
-                         {rainbow.get_rgb('R'):(0.25,0.75),
-                          rainbow.get_rgb('G'):(1.00,0.50),
-                          rainbow.get_rgb('M'):(0.00,0.25),
-                          rainbow.get_rgb('Y'):(0.50,1.00),
-                          rainbow.get_rgb('B'):(0.25,0.00),
-                          rainbow.get_rgb('C'):(0.75,0.00),
-                          rainbow.get_rgb('K'):False,
-                          rainbow.get_rgb('W'):(0.50,0.50)},
-                         {rainbow.get_rgb('G'):(1.00,0.50),
-                          rainbow.get_rgb('M'):(0.00,0.25),
-                          rainbow.get_rgb('Y'):(0.50,1.00),
-                          rainbow.get_rgb('R'):(0.25,0.75),
-                          rainbow.get_rgb('B'):(0.25,0.00),
-                          rainbow.get_rgb('C'):(0.75,0.25),
-                          rainbow.get_rgb('K'):(1.00,0.00),
-                          rainbow.get_rgb('W'):(0.50,0.50)}]
+        self.patterns = [{Rainbow.RED:(0.00,0.00),
+                          Rainbow.GREEN:(1.00,1.00),
+                          Rainbow.BLUE:(1.00,0.00),
+                          Rainbow.YELLOW:(0.50,0.50),
+                          Rainbow.MAGENTA:(0.50,0.00),
+                          Rainbow.CYAN:(1.00,0.50),
+                          Rainbow.BLACK:(0.00,0.75),
+                          Rainbow.WHITE:(0.25,1.00)},
+                         {Rainbow.GREEN:(0.50,1.00),
+                          Rainbow.RED:(0.00,0.00),
+                          Rainbow.BLUE:(0.50,0.50),
+                          Rainbow.YELLOW:(0.00,0.75),
+                          Rainbow.MAGENTA:(0.50,0.00),
+                          Rainbow.CYAN:(1.00,0.50),
+                          Rainbow.BLACK:(1.00,0.00),
+                          Rainbow.WHITE:(1.00,1.00)},
+                         {Rainbow.RED:(0.25,0.75),
+                          Rainbow.GREEN:(1.00,0.50),
+                          Rainbow.MAGENTA:(0.00,0.25),
+                          Rainbow.YELLOW:(0.50,1.00),
+                          Rainbow.BLUE:(0.25,0.00),
+                          Rainbow.CYAN:(0.75,0.00),
+                          Rainbow.BLACK:False,
+                          Rainbow.WHITE:(0.50,0.50)},
+                         {Rainbow.GREEN:(1.00,0.50),
+                          Rainbow.MAGENTA:(0.00,0.25),
+                          Rainbow.YELLOW:(0.50,1.00),
+                          Rainbow.RED:(0.25,0.75),
+                          Rainbow.BLUE:(0.25,0.00),
+                          Rainbow.CYAN:(0.75,0.25),
+                          Rainbow.BLACK:(1.00,0.00),
+                          Rainbow.WHITE:(0.50,0.50)}]
 
     def rotate_corners(self,corners,direction,flip):
         # rotate or flip the corners

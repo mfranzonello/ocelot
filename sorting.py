@@ -43,7 +43,7 @@ def analyze_photos(library,remove_duplicates=True,verbose=True,round_color=True,
             print(' ...removed {} duplicate photo{}'.format(purge_count,'s' if purge_count > 1 else ''))
 
     gallery = Gallery.from_library(library,round_color=round_color,verbose=verbose,grey_pct=grey_pct,dark_pct=dark_pct,
-                                   grey_threshold=16,dark_threshold=100,round_threshold=round_threshold,
+                                   grey_threshold=grey_threshold,dark_threshold=dark_threshold,round_threshold=round_threshold,
                                    dimension=dimension,square=square,randomize=randomize,stories=stories,videos=videos)
 
     return gallery
@@ -53,20 +53,19 @@ def setup_grid(gallery:Gallery,library:Library,square=False,maxsize=20,exp=1,
     # add photos grom a gallery and library to grid
     n_pics = gallery.size
 
+    height = width = int(math.sqrt(n_pics))
+    if not square:
+        sqr = round(math.sqrt(n_pics))
+        sqr_dn = round(math.sqrt(n_pics)*(1-0.1))
+        sqr_up = round(math.sqrt(n_pics)*(1+0.1))
 
-    if square:
-        height = width = 10
-    else:
-        sqr_dn = round(math.sqrt(n_pics)*(1-0.01))
-        sqr_up = round(math.sqrt(n_pics)*(1+0.01))+1
-        sqr_rn = range(sqr_dn,sqr_up)
-        sizes = [(i,j) for i in sqr_rn for j in sqr_rn if (i*j <= n)]
-        deviations = [n_pics-i*j for i in sqr_rn for j in sqr_rn if (i*j <= n)]
-        height,width = sizes[deviations.min(deviations)]
+        sizes = list(itertools.product(range(sqr_dn,sqr+1),range(sqr,sqr_up+1)))
+        deviations = [n_pics-i*j for i,j in sizes]
+        if len(deviations)>0:
+            height,width = sizes[deviations.index(min([d for d in deviations if d>=0]))]
       
     grid = Grid(height,width,exp=exp)
     grid.add_from_gallery(gallery)
-    #rejected = n_pics - height*width
 
     print(' ...using {} of {} images for {}x{} grid'.format(height*width,n_pics,height,width))
 
@@ -81,7 +80,8 @@ def setup_grid(gallery:Gallery,library:Library,square=False,maxsize=20,exp=1,
 
     # print simple
     next_name = find_next_name(folder,name,extension,number=True)
-    grid.save_output(folder=folder,name=next_name,extension=extension,secondary_scale=secondary_scale,display=display)
+    grid.save_output(folder=folder,name=next_name,extension=extension,secondary_scale=secondary_scale,
+                     display=display,print_strength=True)
 
     return grid
 
@@ -90,7 +90,8 @@ def reseed_grid(grid,corners,folder='',name='interval',extension='jpg',secondary
     grid = grid.reseed(corners)
 
     next_name = find_next_name(folder,name,extension,number=True)
-    grid.save_output(folder=folder,name=next_name,extension=extension,secondary_scale=secondary_scale,display=display)
+    grid.save_output(folder=folder,name=next_name,extension=extension,secondary_scale=secondary_scale,
+                     display=display,print_strength=True)
 
     return grid
 
@@ -125,12 +126,10 @@ def swap_worst(grid:Grid,n_trials=1,threshold=0,folder='',name='interval',extens
 
                 grid_swap.swap_pictures([cell1],[cell2])
 
-                improvement = grid.get_tautness() - grid_swap.get_tautness()
+                improvement = grid_swap.get_tautness() - grid.get_tautness()
 
                 if improvement > max_improvement:
                     grid_improved = copy.deepcopy(grid_swap)
-                    ##strengthening = (strength1 - grid_improved.cells[cell1].strength +\
-                    ##    strength2 - grid_improved.cells[cell2].strength)/(strength1 + strength2)
                     max_improvement = improvement
 
                 if improvement > threshold:
@@ -146,12 +145,13 @@ def swap_worst(grid:Grid,n_trials=1,threshold=0,folder='',name='interval',extens
                 pair += 1
 
             taut2 = grid.get_tautness()
-            if taut2 < taut1:
-                print_trial(n,taut=taut1,size=grid.size)#strengthening)
+            if taut2 > taut1:
+                print_trial(n,taut=taut1,size=grid.size)
 
             if time_to_print:
                 next_name = find_next_name(folder,name,extension,number=True)
-                grid.save_output(folder=folder,name=next_name,extension=extension,secondary_scale=secondary_scale,display=display)
+                grid.save_output(folder=folder,name=next_name,extension=extension,secondary_scale=secondary_scale,
+                                 display=display,print_strength=True)
 
                 time_to_print = False
  
@@ -160,21 +160,19 @@ def swap_worst(grid:Grid,n_trials=1,threshold=0,folder='',name='interval',extens
 
     next_name = find_next_name(folder,name,extension,number=True)
     if n%print_after > 0:
-        grid.save_output(folder=folder,name=next_name,extension=extension,secondary_scale=secondary_scale,display=display)
+        grid.save_output(folder=folder,name=next_name,extension=extension,secondary_scale=secondary_scale,
+                         display=display,print_strength=True)
 
     print('\n')
 
     return grid,n
 
-def print_trial(n,taut=None,size=0):#strengthening
+def print_trial(n,taut=None,size=0):
     # update on trial and result
     improve_text = ' | strength: '
-    if taut is not None:#strengthening
-        #strength_0 = Grid.strength_value(tauts[0],size)
-        strength = Grid.strength_value(taut,size)
-        #strengthening =  strength_1 - strength_0
-        spaces = ' '  if strength < 1 else ''
-        improvement = '{}{:0.2%}{}'.format(improve_text,strength,spaces)
+    if taut is not None:
+        spaces = ' '  if taut < 1 else ''
+        improvement = '{}{:0.2%}{}'.format(improve_text,taut,spaces)
     else:
         spaces = ' '*(len(improve_text)+len('100.0%'))
         improvement = ''
@@ -184,8 +182,7 @@ def finalize_grid(grid,library,folder,save_name,extension='jpg',
                   dimension=200,border=0,border_color=(255,255,255)):
     # print final grid with border
     if type(border_color) is str:
-        rainbow = Rainbow()
-        border_color = rainbow.get_rgb(border_color,scaled=False)
+        border_color = Rainbow.get_rgb(border_color,scaled=False)
         if border_color is None:
             border_color = (0,0,0)
 
@@ -197,7 +194,11 @@ def save_gifs(temp_path,folder,save_name,extension='jpg',gif_extension='gif',dim
     # save intermediate steps as a gif and move out of temp folder
 
     if len(files) > 1:
-        imgs = [Image.open('{}/{}'.format(temp_path,fn)).resize((dimension,dimension)) for fn in files]
+        height,width = Image.open('{}/{}'.format(temp_path,files[0])).size
+        dimension_height = round(dimension)
+        dimension_width = round(dimension/height*width)
+
+        imgs = [Image.open('{}/{}'.format(temp_path,fn)).resize((dimension_height,dimension_width)) for fn in files]
         duration = durations[0]
         repeats = durations[1]//durations[0]
         append_images = imgs[1:-1] + [imgs[-1]]*repeats

@@ -2,6 +2,7 @@
 from common import *
 from media import *
 import itertools
+from PIL import ImageDraw,ImageFont
 
 class Cell:
     # basic unit of a grid with picture, position, neighbors and strength
@@ -71,8 +72,8 @@ class Grid:
         # return list of possible cells to insert based on target
         if not position:
             flip = True
-            x = self.height//2
-            y = self.width//2
+            x = round(self.height/2)
+            y = round(self.width/2)
         else:
             flip = False
             x = round(position[0]*(self.height-1))
@@ -105,8 +106,10 @@ class Grid:
     def add_cell(self,picture:Picture,corner=None):
         # add a picture to a cell or the closest open position
         cell_available = False
+
         if corner is None:
             # find first empty cell
+            target = None
             n = 0
             while (not cell_available) & (n < self.size):
                 x = (n)//self.width
@@ -118,6 +121,7 @@ class Grid:
         else:
             # get closest to desitnation
             positions = self.get_order(corner)
+            target = positions[0]
             pos = 0
             while (not cell_available) & (pos < len(positions)):
                 position_try = (positions[pos][0],positions[pos][1])
@@ -131,6 +135,7 @@ class Grid:
             self.cells[(x,y)] = Cell(picture,(x,y))
             self.cells[(x,y)].add_neighbors(self.height,self.width)
             self.add_bridges(self.cells[(x,y)])
+            self.cells[(x,y)].picture.target = target
 
     def add_from_gallery(self,gallery:Gallery):
         # add pictures from a gallery in a specific order
@@ -180,21 +185,34 @@ class Grid:
         distance = self.cells[cell1].picture.difference(self.cells[cell2].picture)
         return distance
 
-    def add_cell_strength(self,cell,angle_penalty=256**2):
+    def add_cell_strength(self,cell,distance_weight=0,angle_weight=0):
         # recalculate strength metric based on bridges
         x0,y0 = cell.position
 
-        angle = cell.picture.angle
-
-        if (angle is not None) & self.account_for_angle:
-            current_angle = math.atan2(y0-self.width/2,x0-self.height/2)
-            angle_strength = angle_penalty * angle_difference(current_angle,angle_simplified(angle+self.angle))
+        # account for placement distance
+        if (distance_weight > 0) & (cell.picture.target is not None):
+            x1,y1 = cell.picture.target
+            distance_strength = math.sqrt((x0 - x1)**2 + (y0 - y1)**2) / math.sqrt(self.height**2 + self.width**2)
         else:
+            distance_weight = 0
+            distance_strength = 0
+
+        # account for placement angle
+        if (angle_weight > 0) & (cell.picture.angle is not None) & self.account_for_angle:
+            angle = cell.picture.angle
+            current_angle = math.atan2(y0-self.width/2,x0-self.height/2)
+            angle_diff = angle_difference(current_angle,angle_simplified(angle+self.angle))
+            angle_strength = angle_weight * angle_diff/(2*math.pi)
+        else:
+            angle_weight = 0
             angle_strength = 0
 
-        self.cells[(x0,y0)].strength = \
-            sum([self.bridges.get((min(x0,x1),min(y0,y1),max(x0,x1),max(y0,y1)),0) for (x1,y1) in cell.neighbors])\
-            * (4/len(cell.neighbors)) + angle_strength
+        # account for color difference
+        difference_weight = 1 - sum([distance_weight,angle_weight])
+        differences = [self.bridges.get((min(x0,x1),min(y0,y1),max(x0,x1),max(y0,y1)),0) for (x1,y1) in cell.neighbors]
+        difference_strength = difference_weight * (sum(differences) / len(cell.neighbors))**2
+        
+        self.cells[(x0,y0)].strength = difference_strength + distance_strength + angle_strength
 
     def add_bridges(self,cell):
         # add connection between neighbor cells
@@ -205,7 +223,7 @@ class Grid:
             for (x1,y1) in cell.neighbors:
                 if self.cell_filled((x1,y1)):
                     picture1 = self.cells[x1,y1].picture
-                    self.bridges[(min(x0,x1),min(y0,y1),max(x0,x1),max(y0,y1))] = picture0.difference(picture1)**self.exp
+                    self.bridges[(min(x0,x1),min(y0,y1),max(x0,x1),max(y0,y1))] = picture0.difference(picture1)
 
             for (x1,y1) in [(x0,y0)]+cell.neighbors:
                 if self.cell_filled((x1,y1)):
@@ -213,10 +231,10 @@ class Grid:
         
     def get_tautness(self):
         # find overall strength of grid
-        taut = 0
-
-        for b in self.bridges:
-            taut += self.bridges[b]
+        # -1 = all cells different from neighbors
+        # 0 = average cells half a color different
+        # 1 = all cells same as neighbors
+        taut = 1-2*rms([self.cells[cell].strength for cell in self.cells])
         return taut
 
     def sort_strengths(self):
@@ -224,12 +242,9 @@ class Grid:
         cell_positions = list(self.cells.keys())
         cell_strengths = [self.cells[c].strength for c in self.cells]
         strengths_sorted = sorted(cell_strengths,reverse=True)
-        self.strengths = []
-        for strength in strengths_sorted:
-            s = cell_strengths.index(strength)
-            self.strengths += [cell_positions[s]]
-            cell_positions.pop(s)
-            cell_strengths.pop(s)
+        self.strengths = sort_by_list(list(self.cells.keys()),
+                                      [self.cells[c].strength for c in self.cells],
+                                      reverse=True)
 
     def worst_cell(self,n=0):
         # find the nth worst performing cell
@@ -239,7 +254,8 @@ class Grid:
         return cell,strength
 
     def save_output(self,folder='',name='interval',extension='jpg',dimension=50,
-                    library=None,secondary_scale=None,vibrant=True,display=False,border=0,border_color=(0,0,0)):
+                    library=None,secondary_scale=None,vibrant=True,display=False,border=0,border_color=(0,0,0),
+                    print_strength=False):
         # print image file of cells
         # if library is not given, only print colors
 
@@ -258,11 +274,29 @@ class Grid:
                         color = picture.color
                     else:
                         color = picture.greyscale
+
                     paste_picture = Image.new('RGB',(dimension,dimension),color.rgb)
+                    
                     if (secondary_scale is not None) & (picture.secondary is not None):
                         secondary = picture.secondary
                         dimension_2 = int(dimension*min(0.5,secondary_scale))
                         paste_secondary = Image.new('RGB',(dimension_2,dimension_2),secondary.rgb)
+                        paste_picture.paste(paste_secondary,(int(dimension*0.5),int(dimension*0.5)))
+
+                    if print_strength:
+                        font_size = round(dimension/5)
+                        font = ImageFont.truetype('C:/Windows/Fonts/Arial.ttf',font_size)
+                        strength_text = '{:.03f}'.format(self.cells[(i,j)].strength)
+                        target_text = '{}'.format(self.cells[(i,j)].picture.target)
+                        rgb_text = '({},{},{})'.format(*self.cells[(i,j)].picture.color.rgb)
+
+                        texts = [strength_text,target_text,rgb_text]
+                        draw = ImageDraw.Draw(paste_picture)
+
+                        for text in texts:
+                            draw.text((0,texts.index(text)*(font_size+1)),text,(255,255,255),font=font)
+                        paste_picture = draw.im
+
                 else:
                     paste_picture = library.get_photo(picture.id).image
                     h,w = paste_picture.size
@@ -271,18 +305,18 @@ class Grid:
                         paste_picture = paste_picture.crop((int(h/2-m),int(w/2-m),int(h/2+m),int(w/2+m)))
 
                     paste_picture = paste_picture.resize((dimension,dimension),Image.ANTIALIAS)
-                grid_image.paste(paste_picture,(int(dimension*j + border*(j+0.5)),
-                                                int(dimension*i + border*(i+0.5)))) #### EXTEND FOR BORDER
 
-                if paste_secondary is not None:
-                    grid_image.paste(paste_secondary,(int((dimension+border)*(j+0.5)),
-                                                      int((dimension+border)*(i+0.5))))
+                paste_box = (int(dimension*j + border*(j+0.5)),
+                             int(dimension*i + border*(i+0.5)),
+                             int(dimension*(j+1) + border*(j+0.5)),
+                             int(dimension*(i+1) + border*(i+0.5)))
+                grid_image.paste(paste_picture,paste_box)
         
         if display == 'show':
             grid_image.show()
         elif display == 'save':
             grid_image.save('{}/{}.{}'.format(folder,name,extension))
 
-    def strength_value(tautness,size,power=0.5,min_taut=5.5,max_taut=20):
-        strength = 1/(1+min(max_taut,max(math.sqrt(tautness)/size,min_taut))**power-min_taut**power)
-        return strength
+    #def strength_value(tautness,size,power=0.5,min_taut=5.5,max_taut=20):
+    #    strength = 1/(1+min(max_taut,max(math.sqrt(tautness)/size,min_taut))**power-min_taut**power)
+    #    return strength

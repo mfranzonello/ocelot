@@ -3,16 +3,18 @@ import os
 import math
 import time
 
-def rank(input):
+def rank(input,reverse=False):
     # return ranking of list
     ranks = [0]*len(input)
     for i,x in enumerate(sorted(range(len(input)),key=lambda y:input[y])):
         ranks[x] = i
+    if reverse:
+        ranks = ranks[::-1]
     return ranks
 
-def sort_by_list(input,rank_list):
+def sort_by_list(input,rank_list,reverse=False):
     # return list sorted by another list
-    ranks = rank(rank_list)
+    ranks = rank(rank_list,reverse=reverse)
     sorted_list = [input[r] for r in ranks]
     return sorted_list
 
@@ -79,3 +81,7 @@ def timer(last_time=None):
     else:
         time_elapsed = current_time - last_time[0]
     return current_time,time_elapsed
+
+def rms(array):
+    rms = math.sqrt(sum([i**2 for i in array])/len(array))
+    return rms

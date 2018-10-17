@@ -250,6 +250,7 @@ class Picture:
         self.secondary = secondary
         self.greyscale = greyscale
         self.angle = self.color.angle
+        self.target = None
 
     def __repr__(self):
         return 'ID: {} | {}'.format(self.display,self.color)
@@ -322,11 +323,12 @@ class Gallery:
 
         # darkness outweighs whiteness
         dark = V < 0.1
-        if dark:
-            S = 1
+        #if dark:
+        #    S = 1
 
         x = max(0,min(1, R * math.cos(H) * S * (2-V)**2 + 0.5))
         y = max(0,min(1, R * math.sin(H) * S * (2-V)**2 + 0.5))
+        
         return (x,y),dark,H
 
     def cycle_list(self,values,n):
