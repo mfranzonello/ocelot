@@ -52,19 +52,18 @@ def setup_grid(gallery:Gallery,library:Library,square=False,maxsize=20,exp=1,
                folder='',name='interval',extension='jpg',print_full=True,secondary_scale=None,display=False):
     # add photos grom a gallery and library to grid
     n_pics = gallery.size
-    sqr = int(math.sqrt(n_pics))
-    height = sqr
-    width = sqr
-    if not square:
-        deviation_0 = n_pics - sqr**2
-        for i in range(min(sqr,4)):
-            for j in range(min(sqr,4)):
-                deviation_1 = n_pics - (sqr - i) * (sqr + j)
-                if (deviation_1 < deviation_0) & (deviation_1 > 0):
-                    deviation_0 = deviation_1
-                    height = sqr - i
-                    width = sqr + j
-        
+
+
+    if square:
+        height = width = 10
+    else:
+        sqr_dn = round(math.sqrt(n_pics)*(1-0.01))
+        sqr_up = round(math.sqrt(n_pics)*(1+0.01))+1
+        sqr_rn = range(sqr_dn,sqr_up)
+        sizes = [(i,j) for i in sqr_rn for j in sqr_rn if (i*j <= n)]
+        deviations = [n_pics-i*j for i in sqr_rn for j in sqr_rn if (i*j <= n)]
+        height,width = sizes[deviations.min(deviations)]
+      
     grid = Grid(height,width,exp=exp)
     grid.add_from_gallery(gallery)
     #rejected = n_pics - height*width
