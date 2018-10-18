@@ -109,64 +109,7 @@ class Color:
 
 class Pattern:
     # pattern order for RMBCGY+WK seeding
-    def __init__(self):
-        self.patterns = [{Rainbow.RED:(0.00,0.00),
-                          Rainbow.GREEN:(1.00,1.00),
-                          Rainbow.BLUE:(1.00,0.00),
-                          Rainbow.YELLOW:(0.50,0.50),
-                          Rainbow.MAGENTA:(0.50,0.00),
-                          Rainbow.CYAN:(1.00,0.50),
-                          Rainbow.BLACK:(0.00,0.75),
-                          Rainbow.WHITE:(0.25,1.00)},
-                         {Rainbow.GREEN:(0.50,1.00),
-                          Rainbow.RED:(0.00,0.00),
-                          Rainbow.BLUE:(0.50,0.50),
-                          Rainbow.YELLOW:(0.00,0.75),
-                          Rainbow.MAGENTA:(0.50,0.00),
-                          Rainbow.CYAN:(1.00,0.50),
-                          Rainbow.BLACK:(1.00,0.00),
-                          Rainbow.WHITE:(1.00,1.00)},
-                         {Rainbow.RED:(0.25,0.75),
-                          Rainbow.GREEN:(1.00,0.50),
-                          Rainbow.MAGENTA:(0.00,0.25),
-                          Rainbow.YELLOW:(0.50,1.00),
-                          Rainbow.BLUE:(0.25,0.00),
-                          Rainbow.CYAN:(0.75,0.00),
-                          Rainbow.BLACK:False,
-                          Rainbow.WHITE:(0.50,0.50)},
-                         {Rainbow.GREEN:(1.00,0.50),
-                          Rainbow.MAGENTA:(0.00,0.25),
-                          Rainbow.YELLOW:(0.50,1.00),
-                          Rainbow.RED:(0.25,0.75),
-                          Rainbow.BLUE:(0.25,0.00),
-                          Rainbow.CYAN:(0.75,0.25),
-                          Rainbow.BLACK:(1.00,0.00),
-                          Rainbow.WHITE:(0.50,0.50)}]
-
-    def rotate_corners(self,corners,direction,flip):
-        # rotate or flip the corners
-        directions = {1:[[0,1,1],[1,-1,0]],
-                      2:[[1,-1,0],[1,-1,1]],
-                      3:[[1,-1,1],[0,1,0]]}
-
-        flips = {-1:[[1,-1],[0,1]],
-                  1:[[0,1],[1,-1]]}
-
-        if direction in directions:
-            coeff = directions[direction] 
-            for corner in corners:
-                corners[corner] = (coeff[0][0]+coeff[0][1]*corners[corner][coeff[0][2]],
-                                   coeff[1][0]+coeff[1][1]*corners[corner][coeff[1][2]])
-
-        if flip in flips:
-            coeff = flips[flip]
-            for corner in corners:
-                corner[corner] = (coeff[0][0]-coeff[0][1]*corner[corners][0],
-                                  coeff[1][0]-coeff[1][1]*corner[corners][1])
-
-        return corners
-
-    def generate_pattern(self,n=False,rotate=0,flip=0,hsv=False,angle=False,account_for_angle=False,hues=True):
+    def generate_pattern(n=False,rotate=0,flip=0,hsv=False,angle=False,account_for_angle=False,hues=True):
         # return a pattern based on hue or a pre-determined mapping
         if hsv:
             corners = {'hsv':True,'angle':angle,'hues':hues,'account for angle':account_for_angle}

@@ -1,6 +1,7 @@
 ### MEDIA OBJECTS ###
 from common import *
 from coloring import *
+import copy
 from PIL import Image,ImageChops
 import cv2
 
@@ -72,7 +73,7 @@ class Library:
         # combine two libraries
         self.photos.update(library.photos)
 
-    def purge(self,dimension=10,threshold=0.9,greys=50,verbose=True):
+    def purge(self,dimension=10,threshold=0.9,greys=50):
         # remove duplicate photos based on pixel content
         dimensions = (dimension,dimension)
         size = dimension**2
@@ -92,12 +93,10 @@ class Library:
             else:
                 uniques.append(image)
 
-            if verbose:
-                analyzed = list(self.photos.keys()).index(photo)/len(self.photos)
-                print(' ...verified {:0.1%}'.format(analyzed),end='\r')
+            analyzed = list(self.photos.keys()).index(photo)/len(self.photos)
+            print(' ...verified {:0.1%}'.format(analyzed),end='\r')
 
-        if verbose:
-            print(' ...verified 100% ')
+        print(' ...verified 100% ')
 
         purge_count = len(self.photos) - len(photos)
         self.photos = photos
@@ -111,7 +110,7 @@ class Library:
 class Instagram:
     # a compressed image with a filename and prominent color
     # can ignore dark or grey pixels to find vibrancy
-    def __init__(self,photo,verbose=False,round_color=False,grey_pct=100,dark_pct=100,
+    def __init__(self,photo,round_color=False,grey_pct=100,dark_pct=100,
                  grey_threshold=16,dark_threshold=100,round_threshold=16,
                  dimension=0,square=True):
         self.im = photo.image.resize((min(10,dimension),min(10,dimension)))
@@ -137,13 +136,12 @@ class Instagram:
         self.sorted = False
 
         if round_color:
-            self.nearest_color(verbose,grey_pct,dark_pct)
+            self.nearest_color(grey_pct,dark_pct)
 
-    def nearest_color(self,verbose=False,grey_pct=100,dark_pct=100,
+    def nearest_color(self,grey_pct=100,dark_pct=100,
                       grey_threshold=16,dark_threshold=100,round_threshold=16):
         # compress image and determine what its most prominent vibrant color
-        if verbose:
-            print(' ...extracting colors for {}'.format(self.display),end='\r')
+        print(' ...extracting colors for {}'.format(self.display),end='\r')
 
         darks = {}
         greys = {}
@@ -286,11 +284,11 @@ class Gallery:
     def __repr__(self):
         return ''.join(['{}\n'.format(picture) for picture in self.pictures])[:-len('\n')]
 
-    def from_library(library,round_color=False,verbose=False,grey_pct=100,dark_pct=100,
+    def from_library(library,round_color=False,grey_pct=100,dark_pct=100,
                      grey_threshold=16,dark_threshold=100,round_threshold=16,
                      dimension=0,square=True,randomize=True,stories='stories',videos='videos'):
         # construct a gallery from a library
-        igs = [Instagram(library.get_photo(photo),verbose=verbose,round_color=round_color,
+        igs = [Instagram(library.get_photo(photo),round_color=round_color,
                          grey_pct=grey_pct,dark_pct=dark_pct,
                          grey_threshold=grey_threshold,dark_threshold=dark_threshold,round_threshold=round_threshold,
                          dimension=dimension,square=square) for photo in library.photos]
@@ -299,8 +297,7 @@ class Gallery:
                             greyscale=ig.prominent_color(vibrant=False)) for ig in igs]
         gallery = Gallery(pictures,randomize=randomize,stories=stories,videos=videos)
     
-        if verbose:
-            print('\n')
+        print('\n')
     
         return gallery
 

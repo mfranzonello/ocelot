@@ -2,20 +2,14 @@
 import os
 import math
 import time
-
-def rank(input,reverse=False):
-    # return ranking of list
-    ranks = [0]*len(input)
-    for i,x in enumerate(sorted(range(len(input)),key=lambda y:input[y])):
-        ranks[x] = i
-    if reverse:
-        ranks = ranks[::-1]
-    return ranks
+import numpy
 
 def sort_by_list(input,rank_list,reverse=False):
     # return list sorted by another list
-    ranks = rank(rank_list,reverse=reverse)
-    sorted_list = [input[r] for r in ranks]
+    sort_flip = -1 if reverse else 1
+    arr1 = numpy.array(input)
+    arr2 = numpy.array(rank_list)
+    sorted_list = arr1[arr2.argsort()[::sort_flip]].tolist()
     return sorted_list
 
 def find_next_name(folder,name,extensions,number=False):
@@ -47,12 +41,11 @@ def find_next_subfolder(folder,name,number=False):
     os.makedirs('{}/{}'.format(folder,name_try))
     return name_try
 
-def find_files(folder_searches,extensions=['']):
+def find_files(folder,extensions=['']):
     # find files in a subfolder with an extension
     files = []
-    for folder in folder_searches:
-        folders = [fold[0] for fold in os.walk(folder)]
-        files += [fl+'/'+fn for fl in folders for fn in os.listdir(fl) if (any('.'+ext in fn for ext in extensions))]
+    folders = [fold[0] for fold in os.walk(folder)]
+    files += [fl+'/'+fn for fl in folders for fn in os.listdir(fl) if (any('.'+ext in fn for ext in extensions))]
     return files
 
 def open_folder(folder):

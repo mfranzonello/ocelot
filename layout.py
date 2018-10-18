@@ -32,7 +32,7 @@ class Grid:
     # collection of cells with bridges and tautness
     # bridge: the connection between neighbor cells
     # tautness: the sum of strengths across all bridges
-    def __init__(self,height:int,width:int=0,exp=1,account_for_angle=False,angle=False):#,outputs=[],finalized=False):
+    def __init__(self,height:int,width:int=0,account_for_angle=False,angle=False):#,outputs=[],finalized=False):
         if width == 0:
             width = height
         self.height = height
@@ -40,8 +40,7 @@ class Grid:
         self.size = height*width
         self.cells = {}
         self.bridges = {}
-        self.strengths = []
-        self.exp = exp
+
         self.account_for_angle=account_for_angle
         self.angle = angle
         
@@ -60,6 +59,10 @@ class Grid:
                 string += ' || '
             string += '\n'
         return string[:-1]
+
+    def copy_grid(self):
+        grid = copy.deepcopy(self)
+        return self
 
     def cell_filled(self,position):
         # check if a cell already has a picture
@@ -153,7 +156,7 @@ class Grid:
         # organize pictures by a color mapping
         gallery = self.send_to_gallery()
         gallery.order_pictures(corners)
-        grid = Grid(self.height,self.width,exp=self.exp,account_for_angle=corners.get('account for angle',False))
+        grid = Grid(self.height,self.width,account_for_angle=corners.get('account for angle',False))
         grid.add_from_gallery(gallery)
         return grid
 
@@ -164,21 +167,46 @@ class Grid:
         pairings = sort_by_list(combos,products)
         return pairings
 
-    def swap_pictures(self,cells1,cells2):
+    def _rms_change(self,original,delta):
+        change = delta * (2*original + delta)
+        return change
+
+    def check_swap(self,cell1,cell2,threshold=0):
+        # check to see if a swap is worthwhile
+        
+        deltas = []
+        cells = [cell1,cell2]
+        # look at each swappable cell and check neighbors
+        for cell in cells:
+            for neighbor in self.cells[cell].neighbors:
+                neighbor_cell = self.cells[neighbor]
+                cell_1 = self.cells[cell]
+                cell_2 = self.cells[cells[1-cells.index(cell)]]
+
+                # look at difference in color distance per neighbor
+                diff0 = neighbor_cell.picture.color.difference(cell_1.picture.color)
+                diff1 = neighbor_cell.picture.color.difference(cell_2.picture.color)
+                delta = (diff1**2 - diff0**2)/len(neighbor_cell.neighbors)
+
+                deltas.append(delta)
+
+        # total marginal change is neighbor difference, doubled for move cells
+        t_delta = 2*sum(deltas)/self.size
+        swap = t_delta < -threshold
+
+        return swap
+
+    def swap_pictures(self,cell1,cell2):
         # move pictures between two cells
-        n_cells = len(cells1)
-        for c in range(n_cells):
-            temp_picture = self.cells[cells1[c]].picture
-            self.cells[cells1[c]].picture = self.cells[cells2[c]].picture
-            self.cells[cells2[c]].picture = temp_picture
+        temp_picture = self.cells[cell1].picture
+        self.cells[cell1].picture = self.cells[cell2].picture
+        self.cells[cell2].picture = temp_picture
 
-        for c in range(n_cells):
-            self.add_bridges(self.cells[cells1[c]])
-            self.add_bridges(self.cells[cells2[c]])
+        self.add_bridges(self.cells[cell1])
+        self.add_bridges(self.cells[cell2])
 
-        for c in range(n_cells):
-            self.add_cell_strength(self.cells[cells1[c]])
-            self.add_cell_strength(self.cells[cells2[c]])
+        self.add_cell_strength(self.cells[cell1])
+        self.add_cell_strength(self.cells[cell2])
 
     def difference(self,cell1,cell2):
         # find distance between colors of pictures in two cells
@@ -210,7 +238,7 @@ class Grid:
         # account for color difference
         difference_weight = 1 - sum([distance_weight,angle_weight])
         differences = [self.bridges.get((min(x0,x1),min(y0,y1),max(x0,x1),max(y0,y1)),0) for (x1,y1) in cell.neighbors]
-        difference_strength = difference_weight * (sum(differences) / len(cell.neighbors))**2
+        difference_strength = difference_weight * (sum(differences) / len(cell.neighbors))
         
         self.cells[(x0,y0)].strength = difference_strength + distance_strength + angle_strength
 
@@ -234,24 +262,15 @@ class Grid:
         # -1 = all cells different from neighbors
         # 0 = average cells half a color different
         # 1 = all cells same as neighbors
-        taut = 1-2*rms([self.cells[cell].strength for cell in self.cells])
+        taut = 1-2*sum([self.cells[cell].strength for cell in self.cells])/self.size
         return taut
 
-    def sort_strengths(self):
+    def worst_cells(self):
         # list cells in order of strength
-        cell_positions = list(self.cells.keys())
-        cell_strengths = [self.cells[c].strength for c in self.cells]
-        strengths_sorted = sorted(cell_strengths,reverse=True)
-        self.strengths = sort_by_list(list(self.cells.keys()),
-                                      [self.cells[c].strength for c in self.cells],
-                                      reverse=True)
-
-    def worst_cell(self,n=0):
-        # find the nth worst performing cell
-        self.sort_strengths()
-        cell = self.strengths[n]
-        strength = self.cells[cell].strength
-        return cell,strength
+        positions = list(self.cells.keys())
+        strengths = sorted([self.cells[c].strength for c in self.cells],reverse=True)
+        worst = sort_by_list(positions,strengths,reverse=True)
+        return worst #,strengths
 
     def save_output(self,folder='',name='interval',extension='jpg',dimension=50,
                     library=None,secondary_scale=None,vibrant=True,display=False,border=0,border_color=(0,0,0),
@@ -316,7 +335,3 @@ class Grid:
             grid_image.show()
         elif display == 'save':
             grid_image.save('{}/{}.{}'.format(folder,name,extension))
-
-    #def strength_value(tautness,size,power=0.5,min_taut=5.5,max_taut=20):
-    #    strength = 1/(1+min(max_taut,max(math.sqrt(tautness)/size,min_taut))**power-min_taut**power)
-    #    return strength
