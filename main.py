@@ -20,26 +20,27 @@ collector.create_gallery(remove_duplicates=remove_duplicates,round_color=True,gr
                          grey_threshold=16,dark_threshold=100,round_threshold=16,dimension=50,square=grid_square,
                          randomize=True,stories='stories',videos='videos')
 
-printer = Printer(collector,name=grid_name,dimension=grid_dimension,dimension_small=50,
+printer = Printer(collector,name=grid_name,dimension=grid_dimension,
                   border_scale=grid_border_scale,border_color=grid_border_color,debugging=debugging)
 
 # assemble photos
-assembler = Assembler(collector,printer,name=grid_name,square=grid_square,secondary_scale=secondary_scale)
+assembler = Assembler(collector,printer,name=grid_name,square=grid_square,secondary_scale=secondary_scale,
+                      distance_weight=distance_weight,angle_weight=angle_weight,print_gif=grid_gif)
 project.add_result('initial',assembler.get_strength())
 
 # seed by color
-sorter = Sorter(assembler,angle_weight=angle_weight,distance_weight=distance_weight,print_after=print_after)
+sorter = Sorter(assembler,print_after=print_after)
 sorter.reseed()
-project.add_result('iterations',sorter.n_trials)
 project.add_result('reseed',sorter.get_strength())
 
 # improve assembly
 sorter.swap_worst(trials=trials)
 sorter.finalize()
+project.add_result('iterations',sorter.n_trials)
 project.add_result('final',sorter.get_strength())
 
 # finish and print
-printer.finalize(grid_extension)
+printer.finalize(grid_extension,gif=grid_gif)
 
 # summarize results
 project.summarize()

@@ -13,12 +13,11 @@ out_folder = 'mosaics'
 # how should the output look?
 grid_name = 'mosaic'
 grid_extension = 'jpg'
-gif_extension = 'gif'
-
 grid_dimension = 200
 grid_square = False
 grid_border_scale = 0.05
 grid_border_color = 'white'
+grid_gif = False
 
 # what content should be used?
 use_profile = True
@@ -33,7 +32,7 @@ angle_weight = 0.2
 distance_weight = 0.3
 
 # should the intermediate steps be saved?
-print_after = 500
+print_after = 1000
 secondary_scale = 1/3
 
 debugging = False

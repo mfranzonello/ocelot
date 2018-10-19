@@ -7,9 +7,10 @@ from structure import *
 import copy
 
 class Engine:
-    def __init__(self,printer:Printer):
+    def __init__(self,printer:Printer,print_gif=False):
         self.grid = None
         self.printer = printer
+        self.print_gif = print_gif
 
     def store_grid(self,dimension=50,full=False,extension='jpg'):
         self.printer.store_grid(self.grid,full=full)
@@ -26,18 +27,21 @@ class Engine:
         return strength
 
 class Assembler(Engine):
-    def __init__(self,collector:Collector,printer:Printer,name='',square=False,secondary_scale=None):
-        Engine.__init__(self,printer)      
+    def __init__(self,collector:Collector,printer:Printer,name='',square=False,secondary_scale=None,
+                 distance_weight=0,angle_weight=0,print_gif=True):
+        Engine.__init__(self,printer,print_gif=print_gif)      
         print('Setting up grid...')
 
         gallery = collector.get_gallery()
         height,width = self._best_fit(gallery.size,square)
         print(' ...using {} of {} images for {}x{} grid'.format(height*width,gallery.size,height,width))
         
-        self.grid = Grid(height,width)
+        self.grid = Grid(height,width,distance_weight=distance_weight,angle_weight=angle_weight)
         self.grid.add_from_gallery(gallery)
-        self.store_grid(full=True)
-        self.store_grid()
+
+        if self.print_gif:
+            self.store_grid(full=True)
+            self.store_grid()
 
     def _best_fit(self,n_pics,square=False):
         height = width = int(math.sqrt(n_pics))
@@ -53,12 +57,9 @@ class Assembler(Engine):
         return height,width
 
 class Sorter(Engine):
-    def __init__(self,assembler:Assembler,angle_weight=0,distance_weight=0,print_after=1000):
-        Engine.__init__(self,assembler.printer)
+    def __init__(self,assembler:Assembler,print_after=1000):
+        Engine.__init__(self,assembler.printer,assembler.print_gif)
         self.grid = assembler.get_grid()
-
-        self.angle_weight = angle_weight
-        self.distance_weight = distance_weight
 
         self.n_trials = 0
         self.print_after = print_after
@@ -66,11 +67,13 @@ class Sorter(Engine):
     def reseed(self):
         print('\nSeeding grid...')
         taut_0 = self.grid.get_tautness()
-        grid = self.grid.reseed(angle_weight=self.angle_weight,distance_weight=self.distance_weight)
+        grid = self.grid.reseed()
         self.grid = grid
         taut_1 = self.grid.get_tautness()
         print(' ...{:0.2%} to {:0.2%} strength'.format(taut_0,taut_1))
-        self.store_grid()
+
+        if self.print_gif:
+            self.store_grid()
         return self.grid
 
     def swap_worst(self,threshold=0,trials=1):
@@ -78,6 +81,7 @@ class Sorter(Engine):
         n = 0
         exhausted = False
         taut_0 = self.grid.get_tautness()
+        swap_last = 0
 
         grid = self.grid.copy_grid()
         pairings = self.grid.worst_pairings()
@@ -87,7 +91,7 @@ class Sorter(Engine):
                 worst = self.grid.worst_cells()
                 pair = 0
                 move_on = False
-                #n += 1
+
                 while (not move_on) & (pair < len(pairings)) & (not exhausted):
                     n += 1
                     
@@ -99,15 +103,16 @@ class Sorter(Engine):
 
                     if swap:
                         taut_1 = grid.get_tautness()
+                        swap_last = n
                         self._update_trial(n,taut_1)
                         move_on = True
                     else:
                         self._update_trial(n)
                         pair += 1
-                        if pair == len(pairings):
+                        if (n - swap_last >= self.print_after) | (pair == len(pairings)):
                             exhausted = True
 
-                    if not n%self.print_after:
+                    if (not n%self.print_after) & self.print_gif:
                         self.store_grid()
 
                     if n == trials:
@@ -116,8 +121,8 @@ class Sorter(Engine):
         except KeyboardInterrupt:
             pass
 
-        self.n_trials += n
-        if n%self.print_after:
+        self.n_trials = n
+        if (n%self.print_after) & self.print_gif:
             self.store_grid()
 
         print()

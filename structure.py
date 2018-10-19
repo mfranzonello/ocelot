@@ -202,24 +202,29 @@ class Printer:
         self.images.append(grid_image)
         return
 
-    def finalize(self,extension='jpg',gif_extension='gif',durations=[500,1000]):
+    def finalize(self,extension='jpg',gif=False,durations=[500,1000]):
         # save intermediate steps as a gif
-        save_name = self._find_next_name(self.project_path,self.name,[extension],number=True)
+        extensions = [extension]
+        if gif:
+            gif_extension = 'gif'
+            extensions.append(gif_extension)
+        save_name = self._find_next_name(self.project_path,self.name,extensions,number=True)
         
         # save final grid as full-size render
         self.images[-1].save('{}/{}.{}'.format(self.project_path,save_name,extension))
 
         # save all steps as small size animation
-        image_sizing = self.images[0]
-        gif_height = int(self.dimension_small * self.height)
-        gif_width = int(self.dimension_small * self.width)
+        if gif:
+            image_sizing = self.images[0]
+            gif_height = int(self.dimension_small * self.height)
+            gif_width = int(self.dimension_small * self.width)
 
-        imgs = [im.resize((gif_width,gif_height)) for im in self.images]
-        duration = durations[0]
-        repeats = durations[1]//durations[0]
-        append_images = imgs[1:-1] + [imgs[-1]]*repeats
+            imgs = [im.resize((gif_width,gif_height)) for im in self.images]
+            duration = durations[0]
+            repeats = durations[1]//durations[0]
+            append_images = imgs[1:-1] + [imgs[-1]]*repeats
 
-        imgs[0].save('{}/{}.{}'.format(self.project_path,save_name,gif_extension),
-                        save_all=True,duration=duration,append_images=append_images,loop=0)
+            imgs[0].save('{}/{}.{}'.format(self.project_path,save_name,gif_extension),
+                            save_all=True,duration=duration,append_images=append_images,loop=0)
 
         os.startfile(self.project_path)

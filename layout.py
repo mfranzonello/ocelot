@@ -155,11 +155,11 @@ class Grid:
         gallery = Gallery([self.cells[cell].picture for cell in self.cells],randomize=False)
         return gallery
 
-    def reseed(self,distance_weight=0,angle_weight=0):
+    def reseed(self):
         # organize pictures by a color mapping
         gallery = self.send_to_gallery()
         gallery.order_pictures()
-        grid = Grid(self.height,self.width,distance_weight=distance_weight,angle_weight=angle_weight)
+        grid = Grid(self.height,self.width,distance_weight=self.distance_weight,angle_weight=self.angle_weight)
         grid.add_from_gallery(gallery)
         return grid
 
