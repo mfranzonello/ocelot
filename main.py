@@ -9,7 +9,9 @@ project = Project(project_path = '{}/{}'.format(path,out_folder),
                   photos_path='{}/{}'.format(path,photos_folder),
                   profile_path='{}/{}'.format(path,profile_folder) if use_profile else False,
                   stories_path = '{}/{}'.format(path,stories_folder) if use_stories else False,
-                  videos_path = '{}/{}'.format(path,videos_folder) if use_videos else False)
+                  videos_path = '{}/{}'.format(path,videos_folder) if use_videos else False,
+                  ig_username=ig_username if check_ig else None,
+                  download_path=downloads_folder)
 
 # get all media
 finder = Finder(project,tick=video_tick)

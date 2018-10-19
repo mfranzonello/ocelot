@@ -2,12 +2,14 @@
 
 # where is the project located?
 path = 'C:/Users/mfran/OneDrive/Projects/mf_traveler_20181013'
+ig_username = 'mf_traveler'
 
 # how is the project structured?
 photos_folder = 'photos'
 profile_folder = 'profile'
 stories_folder = 'stories'
 videos_folder = 'videos'
+downloads_folder = 'downloads'
 out_folder = 'mosaics'
 
 # how should the output look?
@@ -20,6 +22,7 @@ grid_border_color = 'white'
 grid_gif = False
 
 # what content should be used?
+check_ig = True
 use_profile = True
 use_stories = True
 use_videos = True

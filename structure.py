@@ -2,18 +2,22 @@
 from common import *
 from coloring import *
 from media import *
+from access import *
 from layout import *
 import time
 import sys
 import os
 
 class Project:
-    def __init__(self,project_path,photos_path,profile_path=False,stories_path=False,videos_path=False):
+    def __init__(self,project_path,photos_path,profile_path=False,stories_path=False,videos_path=False,
+                 ig_username=None,download_path='downloads'):
         self.project_path = project_path
         self.photos_path = photos_path
         self.profile_path = profile_path
         self.stories_path = stories_path
         self.videos_path = videos_path
+        self.username = ig_username
+        self.download_path = download_path
 
         self.start_time = self._timer()
         self.iterations = 0
@@ -45,32 +49,39 @@ class Project:
 class Finder:
     def __init__(self,project:Project,tick=30):
         self.project_path = project.project_path
-        self.pictures_folder = project.photos_path
-        self.profile_folder = project.profile_path
-        self.stories_folder = project.stories_path
-        self.videos_folder = project.videos_path
+        self.photos_path = project.photos_path
+        self.profile_path = project.profile_path
+        self.stories_path = project.stories_path
+        self.videos_path = project.videos_path
         self.tick = tick
+        self.username = project.username
+        self.download_path = project.download_path
+
         self.library = Library()
+
+        if self.username:
+            self._check_ig()
 
         print('Looking for files...')
         self._get_pictures()
-        if self.profile_folder:
+        if self.profile_path:
             self._get_profile()
-        if self.stories_folder:
+        if self.stories_path:
             self._get_stories()
-        if self.videos_folder:
+        if self.videos_path:
             self._get_videos()
 
-    def _find_files(self,folder,extensions=['']):
-        # find files in a subfolder with an extension
-        files = []
-        folders = [fold[0] for fold in os.walk(folder)]
-        files += [fl+'/'+fn for fl in folders for fn in os.listdir(fl) if (any('.'+ext in fn for ext in extensions))]
-        return files
+    def _check_ig(self):
+        # look if new media is in instagram
+        ig_user = IGAccount('mf_traveler')
+        ig_downloader = IGDownloader(ig_user,photos_path=self.photos_path,videos_path=self.videos_path,
+                                     profile_path=self.profile_path,download_path=self.download_path)
+        ig_downloader.download_media()
+        ### STORIES??
 
     def _get_photos(self,folder,in_extensions=['jpg','png','bmp','gif']):
         # find posted photos, profile or stories
-        files = self._find_files(folder,extensions=in_extensions)
+        files = find_files(folder,extensions=in_extensions)
         photos = [Photo(fn) for fn in files]
         library = Library(photos)
         self.library.merge_library(library)
@@ -79,25 +90,25 @@ class Finder:
         # find posted photos
         print(' ...checking photos',end='')
         sys.stdout.flush()
-        self._get_photos(self.pictures_folder)
+        self._get_photos(self.photos_path)
         
     def _get_profile(self):
         # find profile pic
         print(' + profile',end='')
         sys.stdout.flush()
-        self._get_photos(self.profile_folder)
+        self._get_photos(self.profile_path)
         
     def _get_stories(self):
         # find stories
         print(' + stories',end='')
         sys.stdout.flush()
-        self._get_photos(self.stories_folder)
+        self._get_photos(self.stories_path)
         
     def _get_videos(self,in_extensions=['mp4']):
         # find videos and turn to photos
         print(' + videos',end='')
         sys.stdout.flush()
-        files = self._find_files(self.videos_folder,extensions=in_extensions)
+        files = find_files(self.videos_path,extensions=in_extensions)
         library = Library()
         for fn in files:
             video = Video(fn)
@@ -122,7 +133,6 @@ class Collector:
             print(' ...removed {} duplicate photo{}'.format(purge_count,'s' if purge_count > 1 else ''))
         return library
 
-    
     def create_gallery(self,remove_duplicates=True,round_color=True,grey_pct=0.75,dark_pct=0.6,
                     grey_threshold=16,dark_threshold=100,round_threshold=16,dimension=50,square=True,
                     randomize=True,stories='stories',videos='videos',center=None):

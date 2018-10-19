@@ -1,9 +1,8 @@
 import requests
-import datetime
+#import datetime
+import filecmp
 import os
-from io import BytesIO
-from PIL import Image
-from media import Photo,Video
+from common import *
 
 class IGAuthentications:
     # instagram API url
@@ -28,88 +27,146 @@ class IGAuthentications:
 class IGAccount:
     def __init__(self,username):
         self.username = username
-        self.id = ''
-        self.photos = {}
+        self.id = None
+        self.urls = {'profile':{},
+                     'images':{},
+                     'videos':{}}
+        self.endpoint = IGAuthentications.get_endpoint('media')
+        self.parameters = IGAuthentications.get_token(self.username)
+
+        ok = True
+        jason = None
+        print('Contacting Instagram API')
+        # get profile image
+        ok = self._get_profile()
+        if ok:
+            max_id = None
+            print(' + recent media')
+            while ok:
+                # get rest of images
+                max_id,ok = self._get_info(max_id)
 
     def _id(self,id):
         id = id.replace('_'+self.id,'')
         return id
 
-    def _get_media_from_url(self,url,id,folder):
-        if id in self.photos:
-            n = len([img for img in self.photos if '{}_'.format(id) in img]) + 1
-            id = '{}_{}'.format(id,n)
+    def _get_profile(self):
+        # get basic information
+        endpoint = IGAuthentications.get_endpoint('media')
+        parameters = IGAuthentications.get_token(self.username)
+        response = requests.get(endpoint,parameters)
 
-        # turn a url into an image
-        if len(url) > 0:
-            url_get = requests.get(url)
-            if '.jpg' in url:
-                url_byte = BytesIO(url_get.content)
-                img = Image.open(url_byte)
-                self.photos[id] = {'photo':Photo(url,image=img),'folder':folder}
-            elif '.mp4' in url:
-                ig_video = Video(url)
-                ig_photos = ig_video.get_photos()
-                for photo in ig_photos:
-                    self.photos['{}_{}'.format(id,ig_photos.index(photo))] = {'photo':photo,'folder':folder}
-
-    def _get_media_from_json(self,jason,id,folder):
-        if 'carousel_media' in jason:
-            for carousel in jason['carousel_media']:
-                self._get_media_from_json(carousel,id,folder)
+        if not response.ok:
+            print(' ...no response')
         else:
-            self._get_media_from_url(jason.get('videos',jason['images'])['standard_resolution']['url'],id,folder)
+            print(' ...success')
+            jason = response.json()
+            print(' ...getting profile picture',end='')
 
-    def get_media(self):
+            # set id and get profile picture if first pass
+            if not self.id:
+                self.id = jason['data'][0]['user']['id']
+                profile_url = self._get_image_urls(jason['data'][0]['user'],self.id,'profile')
+
+        return response.ok
+
+    def _get_info(self,max_id):
         # get all images from a user
         endpoint = IGAuthentications.get_endpoint('media')
         parameters = IGAuthentications.get_token(self.username)
 
-        print('Contacting Instagram API')
+        # continue from next page
+        if max_id:
+            parameters['max_id'] = max_id
+
         response = requests.get(endpoint,parameters)
 
-        if not response.ok:
-            print(' ... no response')
-        else:
-            print(' ...success') 
+        ok = response.ok
+        if ok:
+            # collect media from recent posts
             jason = response.json()
-            print(' ...getting profile picture')
-            self._get_media_from_url(jason['data'][0]['user']['profile_picture'],'profile','profile')
-            
-            self.id = jason['data'][0]['user']['id']
-
-            print(' ...getting other media')
-            page = 0
-            while len(jason['data']) > 0:
-                page += 1
-                print(' page {}'.format(page))
-                n = 0
+            ok = len(jason['data']) > 0
+            if ok:
+                max_id = jason['data'][-1]['id']
                 for j in jason['data']:
-                    n += 1
-                    print('  media {}'.format(n),end='\r')
-                    date = datetime.date.fromtimestamp(int(j['created_time']))
-                    folder = '{}{:02}'.format(date.year,date.month)
-                    self._get_media_from_json(j,self._id(j['id']),folder)
+                    media = ''
 
-                parameters.pop('max_id',None)
-                parameters['max_id'] = jason['data'][-1]['id']
+                    for m in ['carousel_media','videos','images']:
+                        if m in j:
+                            media = m
+                    self._get_image_urls(j[media],j['id'],media)
+            
+        return max_id,ok
 
-                response = requests.get(endpoint,parameters)
-                jason = response.json()
-            print()
+    def _get_image_urls(self,data,id,media):
+        if media == 'carousel_media':
+            for c in data[media]:
+                for m in ['videos','images']:
+                    if m in c:
+                        media = m
+                self._get_image_urls(self,c,id,media)
+        else:
+            if id in self.urls[media]:
+                n = len([u for u in self.urls[media] if '{}_'.format(id) in u]) + 1
+                id = '{}_{}'.format(id,n)
 
-        return self.photos
+            if media == 'profile':
+                url = data['profile_picture']
+            else:
+                url = data['standard_resolution']['url']
+            self.urls[media][id] = url
 
-    def download_images(self,folder):
-        print(' ...saving images')
-        for id in self.photos:
-            path = '{}/{}'.format(folder,self.photos[id]['folder'])
+class IGDownloader:
+    def __init__(self,ig_account:IGAccount,photos_path='',videos_path='',
+                 profile_path='',download_path='downloads'):
+        self.paths = {'profile':{'path':profile_path,'ext':'jpg'},
+                      'images':{'path':photos_path,'ext':'jpg'},
+                      'videos':{'path':videos_path,'ext':'mp4'}}
+        self.download_path = download_path
+        self.urls = ig_account.urls
+
+    def _compare_files(self,url_content,files):
+        # check if a file has already been downloaded to folder
+        p = 0
+        unique = True
+        url_btye = io.BytesIO(url_content)
+        while unique & (p < len(files)):
+            file_byte = open(files[p])
+            unique = (url_byte != file_byte)
+            file_byte.close()
+
+        return unique
+
+    def download_media(self):
+        # download files from urls
+        print(' ...downloading new media')
+
+        # check what videos already exists
+        videos = find_files(self.paths['videos']['path'],[self.paths['videos']['path']])
+        
+        for media in self.urls:
+            path = '{}/{}'.format(self.paths[media]['path'],self.download_path)
             if not os.path.isdir(path):
                 os.makedirs(path)
+            ext = self.paths[media]['ext']
 
-            self.photos[id]['photo'].image.save('{}/{}.jpg'.format(path,id))
+            # get file naming
+            for id in self.urls[media]: 
+                url = self.urls[media][id]
+                files = find_files(path)
+                save_name = '{}.{}'.format(id,ext)
+                
+                # check if already downloaded
+                if save_name not in files:
+                    # save url image or video to folder
+                    r = requests.get(url)
 
+                    # if file is a video, check if it has already been downloaded
+                    save_file = True
+                    if media == 'videos':
+                        save_file = self._compare_files(r.content,videos)
 
-ig_user = IGAccount('mf_traveler')
-photos = ig_user.get_media()
-ig_user.download_images('C:\\Users\\mfran\\OneDrive\\Documents\\Job Hunt\\Product Presos')
+                    if save_file:
+                        save_path = '{}/{}.{}'.format(path,id,ext)
+                        with open(save_path, 'wb') as f:  
+                            f.write(r.content)
