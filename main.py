@@ -19,7 +19,7 @@ finder = Finder(project,tick=video_tick)
 # reduce to colors
 collector = Collector(finder)
 collector.create_gallery(remove_duplicates=remove_duplicates,round_color=True,grey_pct=0.75,dark_pct=0.6,
-                         grey_threshold=16,dark_threshold=100,round_threshold=16,dimension=50,square=grid_square,
+                         grey_threshold=16,dark_threshold=100,round_threshold=16,dimension=50,aspect=grid_aspect,
                          randomize=True,stories=stories_folder,videos=videos_folder,
                          center=profile_folder if (use_profile & profile_size) else None)
 
@@ -27,7 +27,7 @@ printer = Printer(collector,name=grid_name,dimension=grid_dimension,
                   border_scale=grid_border_scale,border_color=grid_border_color,debugging=debugging)
 
 # assemble photos
-assembler = Assembler(collector,printer,name=grid_name,square=grid_square,center_size=profile_size,
+assembler = Assembler(collector,printer,name=grid_name,aspect=grid_aspect,center_size=profile_size,
                       secondary_scale=secondary_scale,
                       distance_weight=distance_weight,angle_weight=angle_weight,print_gif=grid_gif)
 project.add_result('initial',assembler.get_strength())

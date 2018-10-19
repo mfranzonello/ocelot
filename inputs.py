@@ -16,7 +16,8 @@ out_folder = 'mosaics'
 grid_name = 'mosaic'
 grid_extension = 'jpg'
 grid_dimension = 200
-grid_square = False
+grid_square = True
+grid_aspect = (16,9) #(1,1), None
 grid_border_scale = 0.05
 grid_border_color = 'white'
 grid_gif = False
@@ -28,7 +29,7 @@ use_stories = True
 use_videos = True
 video_tick = 60
 remove_duplicates = True
-profile_size = 3 # set to zero to not center on profile
+profile_size = 0 # set to zero to not center on profile
 
 # how refined should the process be?
 trials = 6000

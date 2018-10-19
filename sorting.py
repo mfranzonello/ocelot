@@ -29,7 +29,7 @@ class Engine:
 
 class Assembler(Engine):
     # engine that can assemble a grid from collector specifications
-    def __init__(self,collector:Collector,printer:Printer,name='',square=False,center_size=0,
+    def __init__(self,collector:Collector,printer:Printer,name='',aspect=None,center_size=0,
                  secondary_scale=None,distance_weight=0,angle_weight=0,print_gif=True):
         Engine.__init__(self,printer,print_gif=print_gif)      
         print('Setting up grid...')
@@ -37,7 +37,7 @@ class Assembler(Engine):
         gallery = collector.get_gallery()
         # if the gallery didn't turn up a center image, then don't pass center
         center_size = center_size if gallery.center else 0
-        height,width,center_size = self._best_fit(gallery.size,square,center_size=center_size)
+        height,width,center_size = self._best_fit(gallery.size,aspect,center_size=center_size)
         used = int(height*width-center_size**2 + (center_size>0))
         print(' ...using {} of {} images for {}x{} grid'.format(used,gallery.size,height,width))
         
@@ -49,15 +49,19 @@ class Assembler(Engine):
             self.store_grid(full=True)
             self.store_grid()
 
-    def _best_fit(self,n_pics,square=False,center_size=0,odd=None):
+    def _best_fit(self,n_pics,aspect=None,center_size=0,odd=None):
         # find the grid size that can fit a center if present with best ratio
+        # an even width means the center must also be even
+        # an odd width means the center must also be odd
+
+        # if a center size is given, find if even or odd sizing is better
         if center_size > 0:
             center_size_even = round((center_size)/2,0)*2
             center_size_odd = round((center_size-1)/2,0)*2+1
             n_pics_even = n_pics + center_size_even**2
             n_pics_odd = n_pics + center_size_odd**2
-            height_even,width_even,_ = self._best_fit(n_pics_even,square=square,odd=False)
-            height_odd,width_odd,_ = self._best_fit(n_pics_odd,square=square,odd=True)
+            height_even,width_even,_ = self._best_fit(n_pics_even,aspect=aspect,odd=False)
+            height_odd,width_odd,_ = self._best_fit(n_pics_odd,aspect=aspect,odd=True)
 
             deviations_even = n_pics_even - height_even*width_even
             deviations_odd = n_pics_odd - height_odd*width_odd
@@ -66,9 +70,42 @@ class Assembler(Engine):
             else:
                 height,width,center_size = height_odd,width_odd,center_size_odd
 
-        else:    
-            height = width = int(math.sqrt(n_pics))
-            if not square:
+        # no center size given or center size added to n_pics for recursion
+        else:
+            if aspect:
+                aspect_ratio = aspect[0]/aspect[1]
+                # square aspect ratio
+                # only way that works is square root
+                if aspect_ratio == 1:
+                    height = width = int(math.sqrt(n_pics))
+                else:
+                    # specified aspect ratio
+                    # check which way of rounding height and width gives the best fit
+                    height_up = math.ceil(math.sqrt(n_pics*aspect_ratio))
+                    width_up = math.floor(n_pics/height_up)
+
+                    height_down = math.floor(math.sqrt(n_pics*aspect_ratio))
+                    width_down = math.floor(n_pics/height_up)
+
+                    deviations_down = n_pics - height_down*width_down
+                    deviations_up = n_pics - height_up*width_up
+
+                    if odd is not None:
+                        if width_down%2 == odd:
+                            height,width = height_down,width_down
+                        else:
+                            height,width = height_up,width_up
+                    else:
+                        if deviations_down < deviations_up:
+                            height,width = height_down,width_down
+                        else:
+                            height,width = height_up,width_up
+
+            # no specified aspect ratio
+            # start with a square aspect ratio and move with 10% in either direction
+            else:
+                height = width = int(math.sqrt(n_pics))
+
                 sqr = round(math.sqrt(n_pics))
                 sqr_dn = round(math.sqrt(n_pics)*(1-0.1))
                 sqr_up = round(math.sqrt(n_pics)*(1+0.1))

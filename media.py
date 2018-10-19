@@ -111,13 +111,13 @@ class Pixelation:
     # can ignore dark or grey pixels to find vibrancy
     def __init__(self,photo:Photo,round_color=False,grey_pct=100,dark_pct=100,
                  grey_threshold=16,dark_threshold=100,round_threshold=16,
-                 dimension=0,square=True):
+                 dimension=0):
         self.im = photo.image.resize((min(10,dimension),min(10,dimension)))
         self.id = photo.id
         self.display = '~/'+self.id[self.id.rfind('/')+1:]
 
         h,w = self.im.size
-        if square & (h != w):
+        if h != w:
             m = min(h,w)//2
             self.im = self.im.crop((int(h/2-m/2),int(w/2-m/2),int(h/2+m/2),int(w/2+m/2)))
 
@@ -301,13 +301,13 @@ class Gallery:
 
     def from_library(library,round_color=False,grey_pct=100,dark_pct=100,
                      grey_threshold=16,dark_threshold=100,round_threshold=16,
-                     dimension=0,square=True,randomize=True,stories='stories',videos='videos',center=None):
+                     dimension=0,aspect=(1,1),randomize=True,stories='stories',videos='videos',center=None):
         # construct a gallery from a library
         pixelation = [Pixelation(library.get_photo(photo),round_color=round_color,
                                  grey_pct=grey_pct,dark_pct=dark_pct,
                                  grey_threshold=grey_threshold,dark_threshold=dark_threshold,
                                  round_threshold=round_threshold,
-                                 dimension=dimension,square=square) for photo in library.photos]
+                                 dimension=dimension) for photo in library.photos]
         pictures = [Picture(px.id,px.prominent_color(),
                             secondary=px.secondary_color(),
                             greyscale=px.prominent_color(vibrant=False)) for px in pixelation]
