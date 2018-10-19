@@ -4,30 +4,6 @@ import math
 import random
 import colorsys
 
-class Rainbow:
-    # listing of colors and their RGB values
-    hues = ['red','yellow','green','cyan','blue','magenta']
-    greys = ['black','white']
-    codes = ['R','Y','G','C','B','M','K','W']
-    RED = (1,0,0)
-    GREEN = (0,1,0)
-    BLUE = (0,0,1)
-    YELLOW = (1,1,0)
-    MAGENTA = (1,0,1)
-    CYAN = (0,1,1)
-    BLACK = (0,0,0)
-    WHITE = (1,1,1)
-    rgbs = [RED,YELLOW,GREEN,CYAN,BLUE,MAGENTA,BLACK,WHITE]
-    primaries = dict(zip(hues+greys,rgbs))
-    code_names = dict(zip(codes,hues+greys))
-
-    def get_rgb(color_name,scaled=True):
-        # return the RGB tuple of a color based on common name or initial
-        rgb = Rainbow.primaries.get(color_name.lower(),Rainbow.primaries.get(color_name.upper()))
-        if not scaled:
-            rgb = tuple(r*255 for r in rgb)
-        return rgb
-
 class Color:    
     # tuple of RGB
     def __init__(self,red,green,blue):
@@ -109,16 +85,8 @@ class Color:
 
 class Pattern:
     # pattern order for RMBCGY+WK seeding
-    def generate_pattern(n=False,rotate=0,flip=0,hsv=False,angle=False,account_for_angle=False,hues=True):
+    def generate_pattern(hues=True,angle=False,account_for_angle=False):
         # return a pattern based on hue or a pre-determined mapping
-        if hsv:
-            corners = {'hsv':True,'angle':angle,'hues':hues,'account for angle':account_for_angle}
-        else:
-            if not n:
-                n = random.randint(0,len(self.patterns)-1)
-            corners = self.patterns[n]
-
-            if rotate | flip:
-                corners = self.rotate_corners(corners,rotate,flip)
+        corners = {'hsv':True,'angle':angle,'hues':hues,'account for angle':account_for_angle}
 
         return corners

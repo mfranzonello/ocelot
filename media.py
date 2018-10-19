@@ -1,7 +1,7 @@
 ### MEDIA OBJECTS ###
 from common import *
 from coloring import *
-import copy
+
 from PIL import Image,ImageChops
 import cv2
 
@@ -319,9 +319,9 @@ class Gallery:
         R = 0.375
 
         # darkness outweighs whiteness
-        dark = V < 0.1
-        #if dark:
-        #    S = 1
+        dark = color.is_dark()
+        if dark:
+            S = 1
 
         x = max(0,min(1, R * math.cos(H) * S * (2-V)**2 + 0.5))
         y = max(0,min(1, R * math.sin(H) * S * (2-V)**2 + 0.5))
@@ -335,81 +335,42 @@ class Gallery:
 
     def order_pictures(self,corners,by_color=True,stories='stories',videos='videos'):
         # assign an order to add pictures based on prominent color
-        if corners.get('hsv'):
-            # place based on color wheel
-            sorted_dark = []
-            dark_hues = []
-            sorted_vibrant = []
-            vibrant_hues = []
 
-            # place at an angle
-            if not corners['angle']:
-                angle = angle_simplified(random.random()*2*math.pi)
-            else:
-                angle = corners['angle']
-            self.angle = angle_simplified(angle)
+        # place based on color wheel
+        sorted_dark = []
+        dark_hues = []
+        sorted_vibrant = []
+        vibrant_hues = []
 
-            if corners['hues']:
-                hues = sorted([picture.color.hsv[0] for picture in self.pictures])
-            else:
-                hues = []
-            for picture in self.pictures:
-                # get corner and darkness
-                self.corners[picture.id],dark,H = self.get_hsv_corner(picture.color,angle=angle,hues=hues)
-                self.pictures[self.pictures.index(picture)].angle = H
-                # order pictures based on darkness
-                if dark:
-                    sorted_dark.append(picture)
-                    dark_hues.append(H)
-                else:
-                    sorted_vibrant.append(picture)
-                    vibrant_hues.append(H)
-    
-            if by_color:
-                sorted_dark = sort_by_list(sorted_dark,dark_hues)
-                sorted_vibrant = sort_by_list(sorted_vibrant,vibrant_hues)
-
-            sorted_order = sorted_dark + self.cycle_list(sorted_vibrant,6)
-
+        # place at an angle
+        if not corners['angle']:
+            angle = angle_simplified(random.random()*2*math.pi)
         else:
-            # place based on map
-            order = dict(zip(corners,[[]]*len(corners.keys())))
-            for picture in self.pictures:
-                corner_color = picture.color.primary_color()
-                order[corner_color] += [picture]
-                self.corners[picture.id] = corners[corner_color]
+            angle = corners['angle']
+        self.angle = angle_simplified(angle)
 
-            # order pictures per color group based on closeness to color
-            for ord in order:
-                order_list = order[ord]
-                order_new = []
-            
-                distances = [p.color.difference(Color(ord[0]*255,ord[1]*255,ord[2]*255)) for p in order_list]
-                distances_sorted = sorted(distances)
-
-                for d in distances_sorted:
-                    i = distances.index(d)
-                    order_new += [order_list.pop(i)]
-                    distances.pop(i)
-                order[ord] = order_new
-
-            order_values = list(order.values())
-
-            sorted_order = []
-
-            if by_color:
-                counts = [len(v) for v in order.values()]
-                sorted_list = sort_by_list(list(order.keys()),counts)
-                sorted_orders = [order[col] for col in sorted_list]
-                sorted_order = [j for k in sorted_orders for j in k]
+        if corners['hues']:
+            hues = sorted([picture.color.hsv[0] for picture in self.pictures])
+        else:
+            hues = []
+        for picture in self.pictures:
+            # get corner and darkness
+            self.corners[picture.id],dark,H = self.get_hsv_corner(picture.color,angle=angle,hues=hues)
+            self.pictures[self.pictures.index(picture)].angle = H
+            # order pictures based on darkness
+            if dark:
+                sorted_dark.append(picture)
+                dark_hues.append(H)
             else:
-                n = 0
-                while len(sorted_order) < self.size:
-                    if len(order_values[n]) > 0:
-                        sorted_order += [order_values[n].pop()]
-                    n = (n+1)%len(corners)
-        
-            #self.pictures = [self.pictures[self.pictures.index(o)] for o in sorted_order]
+                sorted_vibrant.append(picture)
+                vibrant_hues.append(H)
+    
+        if by_color:
+            sorted_dark = sort_by_list(sorted_dark,dark_hues)
+            sorted_vibrant = sort_by_list(sorted_vibrant,vibrant_hues)
+
+        sorted_order = sorted_dark + self.cycle_list(sorted_vibrant,6)
+
         sorted_pics = [p for p in self.pictures if all(('/{}/'.format(stories) not in p.id,'/{}/'.format(videos) not in p.id))]
         sorted_stories = [p for p in self.pictures if all(('/{}/'.format(stories) in p.id,'/{}/'.format(videos) not in p.id))]
         sorted_videos = [p for p in self.pictures if '/{}/'.format(videos) in p.id]

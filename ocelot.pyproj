@@ -39,6 +39,9 @@
     <Compile Include="inputs.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="structure.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="testing.py">
       <SubType>Code</SubType>
     </Compile>

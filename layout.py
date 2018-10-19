@@ -3,6 +3,7 @@ from common import *
 from media import *
 import itertools
 from PIL import ImageDraw,ImageFont
+import copy
 
 class Cell:
     # basic unit of a grid with picture, position, neighbors and strength
@@ -32,17 +33,20 @@ class Grid:
     # collection of cells with bridges and tautness
     # bridge: the connection between neighbor cells
     # tautness: the sum of strengths across all bridges
-    def __init__(self,height:int,width:int=0,account_for_angle=False,angle=False):#,outputs=[],finalized=False):
+    def __init__(self,height:int,width:int=0,
+                 account_for_angle=False,angle=False,distance_weight=0.2,angle_weight=0.1):#,outputs=[],finalized=False):
         if width == 0:
             width = height
         self.height = height
         self.width = width
         self.size = height*width
         self.cells = {}
-        self.bridges = {}
 
         self.account_for_angle=account_for_angle
         self.angle = angle
+
+        self.distance_weight = distance_weight
+        self.angle_weight = angle_weight
         
         for i in range(height):
             for j in range(width):
@@ -137,7 +141,6 @@ class Grid:
             x,y = position
             self.cells[(x,y)] = Cell(picture,(x,y))
             self.cells[(x,y)].add_neighbors(self.height,self.width)
-            self.add_bridges(self.cells[(x,y)])
             self.cells[(x,y)].picture.target = target
 
     def add_from_gallery(self,gallery:Gallery):
@@ -145,6 +148,8 @@ class Grid:
         self.angle = gallery.angle
         for picture in gallery.pictures:
             self.add_cell(picture,gallery.corners.get(picture.id))
+        self.add_cell_strengths()
+
         return
 
     def send_to_gallery(self):
@@ -174,25 +179,37 @@ class Grid:
     def check_swap(self,cell1,cell2,threshold=0):
         # check to see if a swap is worthwhile
         
-        deltas = []
-        cells = [cell1,cell2]
-        # look at each swappable cell and check neighbors
-        for cell in cells:
-            for neighbor in self.cells[cell].neighbors:
-                neighbor_cell = self.cells[neighbor]
-                cell_1 = self.cells[cell]
-                cell_2 = self.cells[cells[1-cells.index(cell)]]
+        strength_0 = self.get_tautness()
+        self.swap_pictures(cell1,cell2)
+        strength_1 = self.get_tautness()
 
-                # look at difference in color distance per neighbor
-                diff0 = neighbor_cell.picture.color.difference(cell_1.picture.color)
-                diff1 = neighbor_cell.picture.color.difference(cell_2.picture.color)
-                delta = (diff1**2 - diff0**2)/len(neighbor_cell.neighbors)
+        if strength_1 - strength_0 > threshold:
+            # keep swap and tell sorter to move on
+            swap = True
+        else:
+            # undo swap and tell sorter to try next pairing
+            self.swap_pictures(cell1,cell2)
+            swap = False
 
-                deltas.append(delta)
+        #deltas = []
+        #cells = [cell1,cell2]
+        ## look at each swappable cell and check neighbors
+        #for cell in cells:
+        #    for neighbor in self.cells[cell].neighbors:
+        #        neighbor_cell = self.cells[neighbor]
+        #        cell_1 = self.cells[cell]
+        #        cell_2 = self.cells[cells[1-cells.index(cell)]]
 
-        # total marginal change is neighbor difference, doubled for move cells
-        t_delta = 2*sum(deltas)/self.size
-        swap = t_delta < -threshold
+        #        # look at difference in color distance per neighbor
+        #        diff0 = neighbor_cell.picture.color.difference(cell_1.picture.color)
+        #        diff1 = neighbor_cell.picture.color.difference(cell_2.picture.color)
+        #        delta = (diff1**2 - diff0**2)/len(neighbor_cell.neighbors)
+
+        #        deltas.append(delta)
+
+        ## total marginal change is neighbor difference, doubled for move cells
+        #t_delta = 2*sum(deltas)/self.size
+        #swap = t_delta < -threshold
 
         return swap
 
@@ -201,62 +218,62 @@ class Grid:
         temp_picture = self.cells[cell1].picture
         self.cells[cell1].picture = self.cells[cell2].picture
         self.cells[cell2].picture = temp_picture
-
-        self.add_bridges(self.cells[cell1])
-        self.add_bridges(self.cells[cell2])
-
-        self.add_cell_strength(self.cells[cell1])
-        self.add_cell_strength(self.cells[cell2])
+        region = []
+        for cell in cell1,cell2:
+            region.extend([self.cells[cell]] + [self.cells[neighbor] for neighbor in self.cells[cell].neighbors])
+        self.add_cell_strengths(region=region)
 
     def difference(self,cell1,cell2):
         # find distance between colors of pictures in two cells
         distance = self.cells[cell1].picture.difference(self.cells[cell2].picture)
         return distance
 
-    def add_cell_strength(self,cell,distance_weight=0,angle_weight=0):
+    def add_cell_strength(self,cell):
         # recalculate strength metric based on bridges
         x0,y0 = cell.position
 
         # account for placement distance
-        if (distance_weight > 0) & (cell.picture.target is not None):
-            x1,y1 = cell.picture.target
-            distance_strength = math.sqrt((x0 - x1)**2 + (y0 - y1)**2) / math.sqrt(self.height**2 + self.width**2)
+        if (self.distance_weight > 0):
+            distance_weight = self.distance_weight
+            if cell.picture.target is not None:
+                x1,y1 = cell.picture.target
+                distance_strength = math.sqrt((x0 - x1)**2 + (y0 - y1)**2) / math.sqrt(self.height**2 + self.width**2)
+            else:
+                distance_strength = 0.5
         else:
             distance_weight = 0
             distance_strength = 0
 
         # account for placement angle
-        if (angle_weight > 0) & (cell.picture.angle is not None) & self.account_for_angle:
-            angle = cell.picture.angle
-            current_angle = math.atan2(y0-self.width/2,x0-self.height/2)
-            angle_diff = angle_difference(current_angle,angle_simplified(angle+self.angle))
-            angle_strength = angle_weight * angle_diff/(2*math.pi)
+        if (self.angle_weight > 0) & self.account_for_angle:
+            if cell.picture.angle is not None:
+                angle = cell.picture.angle
+                angle_weight = self.angle_weight
+                current_angle = math.atan2(y0-self.width/2,x0-self.height/2)
+                angle_diff = angle_difference(current_angle,angle_simplified(angle+self.angle))
+                angle_strength = angle_weight * angle_diff/(2*math.pi)
+            else:
+                angle_strength = 0.5
         else:
             angle_weight = 0
             angle_strength = 0
 
         # account for color difference
         difference_weight = 1 - sum([distance_weight,angle_weight])
-        differences = [self.bridges.get((min(x0,x1),min(y0,y1),max(x0,x1),max(y0,y1)),0) for (x1,y1) in cell.neighbors]
+        differences = [(cell.picture.difference(self.cells[neighbor].picture))**2 for neighbor in cell.neighbors]
         difference_strength = difference_weight * (sum(differences) / len(cell.neighbors))
         
         self.cells[(x0,y0)].strength = difference_strength + distance_strength + angle_strength
 
-    def add_bridges(self,cell):
-        # add connection between neighbor cells
-        x0,y0 = cell.position
-
-        if self.cell_filled((x0,y0)):
-            picture0 = self.cells[(x0,y0)].picture
-            for (x1,y1) in cell.neighbors:
-                if self.cell_filled((x1,y1)):
-                    picture1 = self.cells[x1,y1].picture
-                    self.bridges[(min(x0,x1),min(y0,y1),max(x0,x1),max(y0,y1))] = picture0.difference(picture1)
-
-            for (x1,y1) in [(x0,y0)]+cell.neighbors:
-                if self.cell_filled((x1,y1)):
-                    self.add_cell_strength(self.cells[(x1,y1)])
-        
+    def add_cell_strengths(self,region=None):
+        # update all cell strengths
+        if region:
+            cells = [cell.position for cell in region]
+        else:
+            cells = self.cells
+        for cell in cells:
+            self.add_cell_strength(self.cells[cell])
+       
     def get_tautness(self):
         # find overall strength of grid
         # -1 = all cells different from neighbors
@@ -268,14 +285,15 @@ class Grid:
     def worst_cells(self):
         # list cells in order of strength
         positions = list(self.cells.keys())
-        strengths = sorted([self.cells[c].strength for c in self.cells],reverse=True)
+        strengths = [self.cells[c].strength for c in self.cells]
         worst = sort_by_list(positions,strengths,reverse=True)
+        worst = [tuple(w) for w in worst]
         return worst #,strengths
 
-    def save_output(self,folder='',name='interval',extension='jpg',dimension=50,
-                    library=None,secondary_scale=None,vibrant=True,display=False,border=0,border_color=(0,0,0),
+    def save_output(self,dimension=50,library=None,
+                    secondary_scale=None,vibrant=True,border=0,border_color=(0,0,0),
                     print_strength=False):
-        # print image file of cells
+        # create image file of cells
         # if library is not given, only print colors
 
         # extend grid and add border color
@@ -331,7 +349,4 @@ class Grid:
                              int(dimension*(i+1) + border*(i+0.5)))
                 grid_image.paste(paste_picture,paste_box)
         
-        if display == 'show':
-            grid_image.show()
-        elif display == 'save':
-            grid_image.save('{}/{}.{}'.format(folder,name,extension))
+        return grid_image
