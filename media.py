@@ -106,7 +106,7 @@ class Library:
         # return number of photos in library
         return len(self.photos)
 
-class Instagram:
+class Pixelation:
     # a compressed image with a filename and prominent color
     # can ignore dark or grey pixels to find vibrancy
     def __init__(self,photo:Photo,round_color=False,grey_pct=100,dark_pct=100,
@@ -303,13 +303,14 @@ class Gallery:
                      grey_threshold=16,dark_threshold=100,round_threshold=16,
                      dimension=0,square=True,randomize=True,stories='stories',videos='videos',center=None):
         # construct a gallery from a library
-        igs = [Instagram(library.get_photo(photo),round_color=round_color,
-                         grey_pct=grey_pct,dark_pct=dark_pct,
-                         grey_threshold=grey_threshold,dark_threshold=dark_threshold,round_threshold=round_threshold,
-                         dimension=dimension,square=square) for photo in library.photos]
-        pictures = [Picture(ig.id,ig.prominent_color(),
-                            secondary=ig.secondary_color(),
-                            greyscale=ig.prominent_color(vibrant=False)) for ig in igs]
+        pixelation = [Pixelation(library.get_photo(photo),round_color=round_color,
+                                 grey_pct=grey_pct,dark_pct=dark_pct,
+                                 grey_threshold=grey_threshold,dark_threshold=dark_threshold,
+                                 round_threshold=round_threshold,
+                                 dimension=dimension,square=square) for photo in library.photos]
+        pictures = [Picture(px.id,px.prominent_color(),
+                            secondary=px.secondary_color(),
+                            greyscale=px.prominent_color(vibrant=False)) for px in pixelation]
         gallery = Gallery(pictures,randomize=randomize,stories=stories,videos=videos,center=center)
     
         print('\n')
