@@ -25,6 +25,7 @@ use_stories = True
 use_videos = True
 video_tick = 60
 remove_duplicates = True
+profile_size = 3 # set to zero to not center on profile
 
 # how refined should the process be?
 trials = 6000

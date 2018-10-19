@@ -97,7 +97,7 @@ class Library:
 
         print(' ...verified 100% ')
 
-        purge_count = len(self.photos) - len(photos)
+        purge_count = len(self.photos) - len(uniques) #len(photos)
         self.photos = photos
 
         return purge_count
@@ -265,16 +265,27 @@ class Picture:
 
 class Gallery:
     # collection of colors with order
-    def __init__(self,pictures,randomize=True,stories='stories',videos='videos'):
-        self.pictures = pictures
+    def __init__(self,pictures,randomize=True,stories='stories',videos='videos',center=None):
+        self.center = None
+        if center:
+            if center in pictures:
+                self.center = center
+            else:
+                center_pics = [p for p in pictures if self._folder_in_id(center,p.id)]
+                if len(center_pics):
+                    self.center = center_pics[0]
+            pictures = [p for p in pictures if p != self.center]
+
         if randomize:
-            pictures1 = [p for p in self.pictures if all(('/{}/'.format(stories) not in p.id,'/{}/'.format(videos) not in p.id))]
-            pictures2 = [p for p in self.pictures if all(('/{}/'.format(stories) in p.id,'/{}/'.format(videos) not in p.id))]
-            pictures3 = [p for p in self.pictures if '/{}/'.format(videos) in p.id]
+            pictures1 = [p for p in pictures if not any((self._folder_in_id(stories,p.id),self._folder_in_id(videos,p.id)))]
+            pictures2 = [p for p in pictures if all((self._folder_in_id(stories,p.id),not self._folder_in_id(videos,p.id)))]
+            pictures3 = [p for p in pictures if self._folder_in_id(videos,p.id)]
             random.shuffle(pictures1)
             random.shuffle(pictures2)
             random.shuffle(pictures3)
-            self.pictures = pictures1 + pictures2 + pictures3
+            pictures = pictures1 + pictures2 + pictures3
+
+        self.pictures = pictures
 
         self.size = len(pictures)
         self.corners = {}
@@ -283,9 +294,14 @@ class Gallery:
     def __repr__(self):
         return ''.join(['{}\n'.format(picture) for picture in self.pictures])[:-len('\n')]
 
+    def _folder_in_id(self,folder,id):
+        slashes = ['\\','/']
+        found = any(['{}{}{}'.format(slash1,folder,slash2) in id for slash1 in slashes for slash2 in slashes])
+        return found
+
     def from_library(library,round_color=False,grey_pct=100,dark_pct=100,
                      grey_threshold=16,dark_threshold=100,round_threshold=16,
-                     dimension=0,square=True,randomize=True,stories='stories',videos='videos'):
+                     dimension=0,square=True,randomize=True,stories='stories',videos='videos',center=None):
         # construct a gallery from a library
         igs = [Instagram(library.get_photo(photo),round_color=round_color,
                          grey_pct=grey_pct,dark_pct=dark_pct,
@@ -294,7 +310,7 @@ class Gallery:
         pictures = [Picture(ig.id,ig.prominent_color(),
                             secondary=ig.secondary_color(),
                             greyscale=ig.prominent_color(vibrant=False)) for ig in igs]
-        gallery = Gallery(pictures,randomize=randomize,stories=stories,videos=videos)
+        gallery = Gallery(pictures,randomize=randomize,stories=stories,videos=videos,center=center)
     
         print('\n')
     

@@ -125,7 +125,7 @@ class Collector:
     
     def create_gallery(self,remove_duplicates=True,round_color=True,grey_pct=0.75,dark_pct=0.6,
                     grey_threshold=16,dark_threshold=100,round_threshold=16,dimension=50,square=True,
-                    randomize=True,stories='stories',videos='videos'):
+                    randomize=True,stories='stories',videos='videos',center=None):
         
         if remove_duplicates:
             library = self._remove_duplicates()
@@ -134,7 +134,8 @@ class Collector:
 
         gallery = Gallery.from_library(library,round_color=round_color,grey_pct=grey_pct,dark_pct=dark_pct,
                                        grey_threshold=grey_threshold,dark_threshold=dark_threshold,round_threshold=round_threshold,
-                                       dimension=dimension,square=square,randomize=randomize,stories=stories,videos=videos)
+                                       dimension=dimension,square=square,randomize=randomize,stories=stories,videos=videos,
+                                       center=center)
 
         self.gallery = gallery
 

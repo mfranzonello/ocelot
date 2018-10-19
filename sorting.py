@@ -7,6 +7,7 @@ from structure import *
 import copy
 
 class Engine:
+    # object that can create or make changes to a grid
     def __init__(self,printer:Printer,print_gif=False):
         self.grid = None
         self.printer = printer
@@ -27,36 +28,65 @@ class Engine:
         return strength
 
 class Assembler(Engine):
-    def __init__(self,collector:Collector,printer:Printer,name='',square=False,secondary_scale=None,
-                 distance_weight=0,angle_weight=0,print_gif=True):
+    # engine that can assemble a grid from collector specifications
+    def __init__(self,collector:Collector,printer:Printer,name='',square=False,center_size=0,
+                 secondary_scale=None,distance_weight=0,angle_weight=0,print_gif=True):
         Engine.__init__(self,printer,print_gif=print_gif)      
         print('Setting up grid...')
 
         gallery = collector.get_gallery()
-        height,width = self._best_fit(gallery.size,square)
-        print(' ...using {} of {} images for {}x{} grid'.format(height*width,gallery.size,height,width))
+        # if the gallery didn't turn up a center image, then don't pass center
+        center_size = center_size if gallery.center else 0
+        height,width,center_size = self._best_fit(gallery.size,square,center_size=center_size)
+        used = int(height*width-center_size**2 + (center_size>0))
+        print(' ...using {} of {} images for {}x{} grid'.format(used,gallery.size,height,width))
         
         self.grid = Grid(height,width,distance_weight=distance_weight,angle_weight=angle_weight)
+        self.grid.add_center(center_size=center_size)
         self.grid.add_from_gallery(gallery)
 
         if self.print_gif:
             self.store_grid(full=True)
             self.store_grid()
 
-    def _best_fit(self,n_pics,square=False):
-        height = width = int(math.sqrt(n_pics))
-        if not square:
-            sqr = round(math.sqrt(n_pics))
-            sqr_dn = round(math.sqrt(n_pics)*(1-0.1))
-            sqr_up = round(math.sqrt(n_pics)*(1+0.1))
+    def _best_fit(self,n_pics,square=False,center_size=0,odd=None):
+        # find the grid size that can fit a center if present with best ratio
+        if center_size > 0:
+            center_size_even = round((center_size)/2,0)*2
+            center_size_odd = round((center_size-1)/2,0)*2+1
+            n_pics_even = n_pics + center_size_even**2
+            n_pics_odd = n_pics + center_size_odd**2
+            height_even,width_even,_ = self._best_fit(n_pics_even,square=square,odd=False)
+            height_odd,width_odd,_ = self._best_fit(n_pics_odd,square=square,odd=True)
 
-            sizes = list(itertools.product(range(sqr_dn,sqr+1),range(sqr,sqr_up+1)))
-            deviations = [n_pics-i*j for i,j in sizes]
-            if len(deviations)>0:
-                height,width = sizes[deviations.index(min([d for d in deviations if d>=0]))]
-        return height,width
+            deviations_even = n_pics_even - height_even*width_even
+            deviations_odd = n_pics_odd - height_odd*width_odd
+            if deviations_even < deviations_odd:
+                height,width,center_size = height_even,width_even,center_size_even
+            else:
+                height,width,center_size = height_odd,width_odd,center_size_odd
+
+        else:    
+            height = width = int(math.sqrt(n_pics))
+            if not square:
+                sqr = round(math.sqrt(n_pics))
+                sqr_dn = round(math.sqrt(n_pics)*(1-0.1))
+                sqr_up = round(math.sqrt(n_pics)*(1+0.1))
+
+                range1 = range(sqr_dn,sqr+1)
+                range2 = range(sqr,sqr_up+1)
+                if odd is not None: # make width odd or even
+                    range2 = [r for r in range2 if r%2 == odd]
+                sizes = list(itertools.product(range1,range2))
+
+                deviations = [n_pics-i*j for i,j in sizes]
+                if len(deviations)>0:
+                    height,width = sizes[deviations.index(min([d for d in deviations if d>=0]))]
+
+        return height,width,center_size
 
 class Sorter(Engine):
+    # engine that can improve color matching in a grid
     def __init__(self,assembler:Assembler,print_after=1000):
         Engine.__init__(self,assembler.printer,assembler.print_gif)
         self.grid = assembler.get_grid()

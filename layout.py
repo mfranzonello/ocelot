@@ -29,6 +29,7 @@ class Cell:
             if ((x1 >= 0) & (x1 < height) & (y1 >= 0) & (y1 < width)):
                 self.neighbors += [(x1,y1)]
 
+
 class Grid:
     # collection of cells with bridges and tautness
     # bridge: the connection between neighbor cells
@@ -40,6 +41,7 @@ class Grid:
         self.width = width
         self.size = height*width
         self.cells = {}
+        self.blocked = []
 
         self.angle = angle
 
@@ -63,120 +65,124 @@ class Grid:
         return string[:-1]
 
     def copy_grid(self):
+        # copy grid
         grid = copy.deepcopy(self)
         return self
 
+    #def _block_cells(self,positions,unblock=False):
+    #    # prevent cells from being used
+    #    for position in positions:
+    #        if not self.cell_filled(position):
+    #            self.cells[position] = Cell(None,position)
+    #        if unblock & (position in self.blocked):
+    #            self.blocked.pop(self.blocked.index(position))
+    #        else:
+    #            self.blocked.append(position)
+
+    def _safe_cells(self):
+        # returns unblocked cells that have images
+        safe_cells = [cell for cell in self.cells if cell not in self.blocked]
+        return safe_cells
+
     def cell_filled(self,position):
         # check if a cell already has a picture
-        filled = False
-        if self.cells[position] is not None:
-            filled = True
+        filled = (self.cells[position] is not None) | (position in self.blocked)
+
         return filled
 
-    def get_order(self,position):
+    def _get_order(self,corner=None):
         # return list of possible cells to insert based on target
-        if not position:
-            flip = True
-            x = round(self.height/2)
-            y = round(self.width/2)
+        closed_positions = [cell for cell in self.cells if self.cell_filled(cell)]
+        open_positions = sorted([(i,j) for i in range(self.height) for j in range(self.width) if (i,j) not in closed_positions])
+        if corner:
+            target = (corner[0]*(self.height-1),corner[1]*(self.width-1))
+            distances = [math.sqrt((i-target[0])**2 + (j-target[1])**2) for i,j in open_positions]
+            open_positions = sort_by_list(open_positions,distances)
         else:
-            flip = False
-            x = round(position[0]*(self.height-1))
-            y = round(position[1]*(self.width-1))
-        
-        positions = [(x,y)]
+            target = None
 
-        n_max = max(2*self.height,2*self.width)
-        for n in range(1,n_max):
-            x_inc = -n
-            y_inc = 0
-            x_move = 1
-            y_move = 1
-            for m in range(n*4):
-                x_new = x+x_inc
-                y_new = y+y_inc
-                if (x_new >= 0) & (x_new < self.height) & (y_new >= 0) & (y_new < self.width):
-                    positions += [(x_new,y_new)]
-                x_inc += x_move
-                y_inc += y_move
-                if abs(x_inc) == n:
-                    x_move *= -1
-                if abs(y_inc) == n:
-                    y_move *= -1
-        if flip:
-            positions.reverse()
-
-        return positions 
+        if len(open_positions)>0:
+            position = open_positions[0]
+        else:
+            position = None
+        return position,target
 
     def add_cell(self,picture:Picture,corner=None):
         # add a picture to a cell or the closest open position
-        cell_available = False
-
-        if corner is None:
-            # find first empty cell
-            target = None
-            n = 0
-            while (not cell_available) & (n < self.size):
-                x = (n)//self.width
-                y = (n)%self.width
-                if (not self.cell_filled((x,y))):
-                    cell_available = True
-                    position = (x,y)
-                n += 1
-        else:
-            # get closest to desitnation
-            positions = self.get_order(corner)
-            target = positions[0]
-            pos = 0
-            while (not cell_available) & (pos < len(positions)):
-                position_try = (positions[pos][0],positions[pos][1])
-                if (not self.cell_filled(position_try)):
-                    cell_available = True
-                    position = position_try
-                pos += 1
-                   
-        if cell_available:
+        position,target = self._get_order(corner)      
+        if position:
             x,y = position
-            self.cells[(x,y)] = Cell(picture,(x,y))
+
+            cell = Cell(picture,(x,y))
+            self.cells[(x,y)] = cell
+      
             self.cells[(x,y)].add_neighbors(self.height,self.width)
             self.cells[(x,y)].picture.target = target
+
+    def add_center(self,center_size=1,blocked=None):
+        # block off space in the center of the grid for a larger central image
+        # height and width should both be odd or even together
+        # need to round center_size to be odd or even too
+        # ensure a buffer between the center and the sides of the grid
+        if blocked is not None:
+            self.blocked.extend(blocked)
+        else:
+            x0 = int((self.height - center_size)/2)
+            y0 = int((self.width - center_size)/2)
+            x1 = int((self.height + center_size)/2)
+            y1 = int((self.width + center_size)/2)
+
+            self.blocked.extend([(x,y) for x in range(x0,x1) for y in range(y0,y1)])
 
     def add_from_gallery(self,gallery:Gallery):
         # add pictures from a gallery in a specific order
         self.angle = gallery.angle
+        if gallery.center:
+            center_xy = min(self.blocked)
+            self.cells[center_xy] = Cell(gallery.center,center_xy)
+
         for picture in gallery.pictures:
             self.add_cell(picture,gallery.corners.get(picture.id))
+
         self.add_cell_strengths()
 
         return
 
     def send_to_gallery(self):
         # put all pictures back into a gallery
-        gallery = Gallery([self.cells[cell].picture for cell in self.cells],randomize=False)
+        if len(self.blocked):
+            center_xy = min(self.blocked)
+            center = self.cells[center_xy].picture
+        else:
+            center = None
+
+        pictures = [self.cells[cell].picture for cell in self._safe_cells()]
+        if center:
+            pictures.append(center)
+
+        gallery = Gallery(pictures,randomize=False,center=center)
         return gallery
 
     def reseed(self):
         # organize pictures by a color mapping
         gallery = self.send_to_gallery()
+        
         gallery.order_pictures()
         grid = Grid(self.height,self.width,distance_weight=self.distance_weight,angle_weight=self.angle_weight)
+        grid.add_center(blocked=self.blocked)
         grid.add_from_gallery(gallery)
         return grid
 
     def worst_pairings(self):
         # list of cells pairings by order of strengths
-        combos = list(itertools.combinations(range(self.size),2))
+        combos = list(itertools.combinations(range(self.size - len(self.blocked)),2))
         products = [(i+1)*(j+1) for i,j in combos]
         pairings = sort_by_list(combos,products)
         return pairings
 
-    def _rms_change(self,original,delta):
-        change = delta * (2*original + delta)
-        return change
-
     def check_swap(self,cell1,cell2,threshold=0):
         # check to see if a swap is worthwhile
-        
+    
         strength_0 = self.get_tautness()
         self.swap_pictures(cell1,cell2)
         strength_1 = self.get_tautness()
@@ -198,7 +204,8 @@ class Grid:
         self.cells[cell2].picture = temp_picture
         region = []
         for cell in cell1,cell2:
-            region.extend([self.cells[cell]] + [self.cells[neighbor] for neighbor in self.cells[cell].neighbors])
+            neighbors = [self.cells[neighbor] for neighbor in self.cells[cell].neighbors if neighbor not in self.blocked]
+            region.extend([self.cells[cell]] + neighbors)
         self.add_cell_strengths(region=region)
 
     def difference(self,cell1,cell2):
@@ -238,8 +245,9 @@ class Grid:
 
         # account for color difference
         difference_weight = 1 - sum([distance_weight,angle_weight])
-        differences = [(cell.picture.difference(self.cells[neighbor].picture))**2 for neighbor in cell.neighbors]
-        difference_strength = difference_weight * (sum(differences) / len(cell.neighbors))
+        neighbors = [neighbor for neighbor in cell.neighbors if neighbor not in self.blocked]
+        differences = [(cell.picture.difference(self.cells[neighbor].picture))**2 for neighbor in neighbors]
+        difference_strength = difference_weight * (sum(differences) / len(neighbors))
         
         self.cells[(x0,y0)].strength = difference_strength + distance_strength + angle_strength
 
@@ -248,7 +256,7 @@ class Grid:
         if region:
             cells = [cell.position for cell in region]
         else:
-            cells = self.cells
+            cells = [cell for cell in self.cells if cell not in self.blocked]
         for cell in cells:
             self.add_cell_strength(self.cells[cell])
        
@@ -257,13 +265,14 @@ class Grid:
         # -1 = all cells different from neighbors
         # 0 = average cells half a color different
         # 1 = all cells same as neighbors
-        taut = 1-2*sum([self.cells[cell].strength for cell in self.cells])/self.size
+        safe_cells = self._safe_cells()
+        taut = 1-2*sum([self.cells[cell].strength for cell in safe_cells])/len(safe_cells)
         return taut
 
     def worst_cells(self):
         # list cells in order of strength
-        positions = list(self.cells.keys())
-        strengths = [self.cells[c].strength for c in self.cells]
+        positions = self._safe_cells()
+        strengths = [self.cells[c].strength for c in positions]
         worst = sort_by_list(positions,strengths,reverse=True)
         worst = [tuple(w) for w in worst]
         return worst #,strengths
@@ -282,49 +291,56 @@ class Grid:
 
         for i in range(self.height):
             for j in range(self.width):
-                picture = self.cells[(i,j)].picture
-                paste_secondary = None
-                if library is None:
-                    if vibrant:
-                        color = picture.color
-                    else:
-                        color = picture.greyscale
+                if self.cells[(i,j)]:
+                    picture = self.cells[(i,j)].picture
+                    # expand the center image
+                    dim_mul = 1
 
-                    paste_picture = Image.new('RGB',(dimension,dimension),color.rgb)
+                    if (i,j) == min(self.blocked):
+                        dim_mul = (max(self.blocked)[0] - min(self.blocked)[0] + 1)
+                        
+                    paste_secondary = None
+                    if library is None:
+                        if vibrant:
+                            color = picture.color
+                        else:
+                            color = picture.greyscale
+
+                        paste_picture = Image.new('RGB',(dimension*dim_mul,dimension*dim_mul),color.rgb)
                     
-                    if (secondary_scale is not None) & (picture.secondary is not None):
-                        secondary = picture.secondary
-                        dimension_2 = int(dimension*min(0.5,secondary_scale))
-                        paste_secondary = Image.new('RGB',(dimension_2,dimension_2),secondary.rgb)
-                        paste_picture.paste(paste_secondary,(int(dimension*0.5),int(dimension*0.5)))
+                        if (secondary_scale is not None) & (picture.secondary is not None):
+                            secondary = picture.secondary
+                            dimension_2 = int(dimension*min(0.5,secondary_scale))
+                            paste_secondary = Image.new('RGB',(dimension_2,dimension_2),secondary.rgb)
+                            paste_picture.paste(paste_secondary,(int(dimension*0.5),int(dimension*0.5)))
 
-                    if print_strength:
-                        font_size = round(dimension/5)
-                        font = ImageFont.truetype('C:/Windows/Fonts/Arial.ttf',font_size)
-                        strength_text = '{:.03f}'.format(self.cells[(i,j)].strength)
-                        target_text = '{}'.format(self.cells[(i,j)].picture.target)
-                        rgb_text = '({},{},{})'.format(*self.cells[(i,j)].picture.color.rgb)
+                        if print_strength:
+                            font_size = round(dimension/5)
+                            font = ImageFont.truetype('C:/Windows/Fonts/Arial.ttf',font_size) ### LINK SOMEWHERE
+                            strength_text = '{:.03f}'.format(self.cells[(i,j)].strength)
+                            target_text = '{}'.format(self.cells[(i,j)].picture.target)
+                            rgb_text = '({},{},{})'.format(*self.cells[(i,j)].picture.color.rgb)
 
-                        texts = [strength_text,target_text,rgb_text]
-                        draw = ImageDraw.Draw(paste_picture)
+                            texts = [strength_text,target_text,rgb_text]
+                            draw = ImageDraw.Draw(paste_picture)
 
-                        for text in texts:
-                            draw.text((0,texts.index(text)*(font_size+1)),text,(255,255,255),font=font)
-                        paste_picture = draw.im
+                            for text in texts:
+                                draw.text((0,texts.index(text)*(font_size+1)),text,(255,255,255),font=font)
+                            paste_picture = draw.im
 
-                else:
-                    paste_picture = library.get_photo(picture.id).image
-                    h,w = paste_picture.size
-                    if h != w:
-                        m = min(h,w)/2
-                        paste_picture = paste_picture.crop((int(h/2-m),int(w/2-m),int(h/2+m),int(w/2+m)))
+                    else:
+                        paste_picture = library.get_photo(picture.id).image
+                        h,w = paste_picture.size
+                        if h != w:
+                            m = min(h,w)/2
+                            paste_picture = paste_picture.crop((int(h/2-m),int(w/2-m),int(h/2+m),int(w/2+m)))
+                        dim_resize = dimension*dim_mul + border*(dim_mul-1)
+                        paste_picture = paste_picture.resize((dim_resize,dim_resize),Image.ANTIALIAS)
 
-                    paste_picture = paste_picture.resize((dimension,dimension),Image.ANTIALIAS)
-
-                paste_box = (int(dimension*j + border*(j+0.5)),
-                             int(dimension*i + border*(i+0.5)),
-                             int(dimension*(j+1) + border*(j+0.5)),
-                             int(dimension*(i+1) + border*(i+0.5)))
-                grid_image.paste(paste_picture,paste_box)
+                    paste_box = (int(dimension*j + border*(j+0.5)),
+                                 int(dimension*i + border*(i+0.5)),
+                                 int(dimension*(j+dim_mul) + border*(j+dim_mul-0.5)),
+                                 int(dimension*(i+dim_mul) + border*(i+dim_mul-0.5)))
+                    grid_image.paste(paste_picture,paste_box)
         
         return grid_image
