@@ -33,8 +33,7 @@ class Grid:
     # collection of cells with bridges and tautness
     # bridge: the connection between neighbor cells
     # tautness: the sum of strengths across all bridges
-    def __init__(self,height:int,width:int=0,
-                 account_for_angle=False,angle=False,distance_weight=0.2,angle_weight=0.1):#,outputs=[],finalized=False):
+    def __init__(self,height:int,width:int=0,angle=False,distance_weight=0,angle_weight=0):
         if width == 0:
             width = height
         self.height = height
@@ -42,7 +41,6 @@ class Grid:
         self.size = height*width
         self.cells = {}
 
-        self.account_for_angle=account_for_angle
         self.angle = angle
 
         self.distance_weight = distance_weight
@@ -157,11 +155,11 @@ class Grid:
         gallery = Gallery([self.cells[cell].picture for cell in self.cells],randomize=False)
         return gallery
 
-    def reseed(self,corners):
+    def reseed(self,distance_weight=0,angle_weight=0):
         # organize pictures by a color mapping
         gallery = self.send_to_gallery()
-        gallery.order_pictures(corners)
-        grid = Grid(self.height,self.width,account_for_angle=corners.get('account for angle',False))
+        gallery.order_pictures()
+        grid = Grid(self.height,self.width,distance_weight=distance_weight,angle_weight=angle_weight)
         grid.add_from_gallery(gallery)
         return grid
 
@@ -190,26 +188,6 @@ class Grid:
             # undo swap and tell sorter to try next pairing
             self.swap_pictures(cell1,cell2)
             swap = False
-
-        #deltas = []
-        #cells = [cell1,cell2]
-        ## look at each swappable cell and check neighbors
-        #for cell in cells:
-        #    for neighbor in self.cells[cell].neighbors:
-        #        neighbor_cell = self.cells[neighbor]
-        #        cell_1 = self.cells[cell]
-        #        cell_2 = self.cells[cells[1-cells.index(cell)]]
-
-        #        # look at difference in color distance per neighbor
-        #        diff0 = neighbor_cell.picture.color.difference(cell_1.picture.color)
-        #        diff1 = neighbor_cell.picture.color.difference(cell_2.picture.color)
-        #        delta = (diff1**2 - diff0**2)/len(neighbor_cell.neighbors)
-
-        #        deltas.append(delta)
-
-        ## total marginal change is neighbor difference, doubled for move cells
-        #t_delta = 2*sum(deltas)/self.size
-        #swap = t_delta < -threshold
 
         return swap
 
@@ -245,7 +223,7 @@ class Grid:
             distance_strength = 0
 
         # account for placement angle
-        if (self.angle_weight > 0) & self.account_for_angle:
+        if self.angle_weight > 0:
             if cell.picture.angle is not None:
                 angle = cell.picture.angle
                 angle_weight = self.angle_weight

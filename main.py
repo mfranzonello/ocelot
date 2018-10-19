@@ -21,15 +21,16 @@ collector.create_gallery(remove_duplicates=remove_duplicates,round_color=True,gr
                          randomize=True,stories='stories',videos='videos')
 
 printer = Printer(collector,name=grid_name,dimension=grid_dimension,dimension_small=50,
-                  border_scale=grid_border_scale,border_color=grid_border_color,debugging=True)
+                  border_scale=grid_border_scale,border_color=grid_border_color,debugging=debugging)
 
 # assemble photos
 assembler = Assembler(collector,printer,name=grid_name,square=grid_square,secondary_scale=secondary_scale)
 project.add_result('initial',assembler.get_strength())
 
 # seed by color
-sorter = Sorter(assembler,hsv=True,hues=True,account_for_angle=True)
+sorter = Sorter(assembler,angle_weight=angle_weight,distance_weight=distance_weight,print_after=print_after)
 sorter.reseed()
+project.add_result('iterations',sorter.n_trials)
 project.add_result('reseed',sorter.get_strength())
 
 # improve assembly

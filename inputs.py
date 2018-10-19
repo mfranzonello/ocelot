@@ -28,8 +28,12 @@ video_tick = 60
 remove_duplicates = True
 
 # how refined should the process be?
-trials = 3000
+trials = 6000
+angle_weight = 0.2
+distance_weight = 0.3
 
 # should the intermediate steps be saved?
 print_after = 500
 secondary_scale = 1/3
+
+debugging = False

@@ -53,18 +53,20 @@ class Assembler(Engine):
         return height,width
 
 class Sorter(Engine):
-    def __init__(self,assembler:Assembler,hsv=True,hues=True,account_for_angle=True,print_after=1000):
+    def __init__(self,assembler:Assembler,angle_weight=0,distance_weight=0,print_after=1000):
         Engine.__init__(self,assembler.printer)
         self.grid = assembler.get_grid()
+
+        self.angle_weight = angle_weight
+        self.distance_weight = distance_weight
+
         self.n_trials = 0
         self.print_after = print_after
-
-        self.corners = Pattern.generate_pattern(hues=True,account_for_angle=True)
 
     def reseed(self):
         print('\nSeeding grid...')
         taut_0 = self.grid.get_tautness()
-        grid = self.grid.reseed(self.corners)
+        grid = self.grid.reseed(angle_weight=self.angle_weight,distance_weight=self.distance_weight)
         self.grid = grid
         taut_1 = self.grid.get_tautness()
         print(' ...{:0.2%} to {:0.2%} strength'.format(taut_0,taut_1))

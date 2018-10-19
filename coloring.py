@@ -38,33 +38,20 @@ class Color:
         blue = int(round(self.blue/threshold)*threshold)
         return red,green,blue
 
-    def difference(self,color,method='rgb',r_weight=2,g_weight=4,b_weight=3,r_add_weight=128,coeff=0.005,scaled=True):
+    def difference(self,color,r_weight=2,g_weight=4,b_weight=3,scaled=True):
         # find the distance between two colors
 
         max_delta = 255
 
-        # use euclidian RGB
-        if method=='rgb':
-            r_add = self.red + color.red
-            r_delta = self.red - color.red
-            g_delta = self.green - color.green
-            b_delta = self.blue - color.blue
+        # use euclidian 
+        r_delta = self.red - color.red
+        g_delta = self.green - color.green
+        b_delta = self.blue - color.blue
         
-            distance = math.sqrt(r_weight*r_delta**2 + 
-                                 g_weight*g_delta**2 + 
-                                 b_weight*b_delta**2)# + 
-                                 #r_add_weight*r_add*(r_delta**2-b_delta**2))
+        distance = math.sqrt(r_weight*r_delta**2 + g_weight*g_delta**2 + b_weight*b_delta**2)
 
-            if scaled:
-                distance /= math.sqrt(r_weight*max_delta**2 + g_weight*max_delta**2 + b_weight*max_delta**2)
-
-        # use HSV distance
-        elif method=='hsv':
-            h1,s1,v1 = self.hsv
-            h2,s2,v2 = self.hsv
-            distance = (math.sin(h1)*s1*v1 - math.sin(h2)*s2*v2)**2 \
-                + (math.cos(h1)*s1*v1 - math.cos(h2)*s2*v2 )**2 \
-                + coeff*(v1 - v2)**2
+        if scaled:
+            distance /= math.sqrt(r_weight*max_delta**2 + g_weight*max_delta**2 + b_weight*max_delta**2)
 
         return distance
 
@@ -82,11 +69,3 @@ class Color:
         primary_color = Rainbow.get_rgb(primary)
 
         return primary_color
-
-class Pattern:
-    # pattern order for RMBCGY+WK seeding
-    def generate_pattern(hues=True,angle=False,account_for_angle=False):
-        # return a pattern based on hue or a pre-determined mapping
-        corners = {'hsv':True,'angle':angle,'hues':hues,'account for angle':account_for_angle}
-
-        return corners

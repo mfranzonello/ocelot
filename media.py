@@ -30,19 +30,18 @@ class Video:
         im = Image.fromarray(cv2.cvtColor(cv2_image,cv2.COLOR_BGR2RGB))
         return im
 
-    def get_photos(self,tick=60,first_only=False):
+    def get_photos(self,tick=60):
         # export periodic frames as images
         cap = cv2.VideoCapture(self.id)
-        success,cv2_image = cap.read()
-        photos = []
 
-        if first_only:
-            photos = self.cv2_to_image(cv2_image)
-        else:
-            while success:
-                photos.append(Photo('{}_{}'.format(self.id,len(photos)),self.cv2_to_image(cv2_image)))
-                for k in range(tick):
-                    success,cv2_image = cap.read()
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        frames = range(0,frame_count,tick)
+
+        photos = []
+        for f in frames:
+            cap.set(cv2.CAP_PROP_POS_FRAMES,f)
+            success,cv2_image = cap.read()
+            photos.append(Photo('{}_{}'.format(self.id,len(photos)),self.cv2_to_image(cv2_image)))
 
         cap.release()
 
@@ -110,7 +109,7 @@ class Library:
 class Instagram:
     # a compressed image with a filename and prominent color
     # can ignore dark or grey pixels to find vibrancy
-    def __init__(self,photo,round_color=False,grey_pct=100,dark_pct=100,
+    def __init__(self,photo:Photo,round_color=False,grey_pct=100,dark_pct=100,
                  grey_threshold=16,dark_threshold=100,round_threshold=16,
                  dimension=0,square=True):
         self.im = photo.image.resize((min(10,dimension),min(10,dimension)))
@@ -333,7 +332,7 @@ class Gallery:
         cycled = [values[v] for m in range(n) for v in range(len(values)) if v%n == m]
         return cycled
 
-    def order_pictures(self,corners,by_color=True,stories='stories',videos='videos'):
+    def order_pictures(self,stories='stories',videos='videos'):
         # assign an order to add pictures based on prominent color
 
         # place based on color wheel
@@ -343,16 +342,11 @@ class Gallery:
         vibrant_hues = []
 
         # place at an angle
-        if not corners['angle']:
-            angle = angle_simplified(random.random()*2*math.pi)
-        else:
-            angle = corners['angle']
+        angle = angle_simplified(random.random()*2*math.pi)
         self.angle = angle_simplified(angle)
 
-        if corners['hues']:
-            hues = sorted([picture.color.hsv[0] for picture in self.pictures])
-        else:
-            hues = []
+        hues = sorted([picture.color.hsv[0] for picture in self.pictures])
+
         for picture in self.pictures:
             # get corner and darkness
             self.corners[picture.id],dark,H = self.get_hsv_corner(picture.color,angle=angle,hues=hues)
@@ -365,9 +359,8 @@ class Gallery:
                 sorted_vibrant.append(picture)
                 vibrant_hues.append(H)
     
-        if by_color:
-            sorted_dark = sort_by_list(sorted_dark,dark_hues)
-            sorted_vibrant = sort_by_list(sorted_vibrant,vibrant_hues)
+        sorted_dark = sort_by_list(sorted_dark,dark_hues)
+        sorted_vibrant = sort_by_list(sorted_vibrant,vibrant_hues)
 
         sorted_order = sorted_dark + self.cycle_list(sorted_vibrant,6)
 

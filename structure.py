@@ -143,7 +143,7 @@ class Collector:
         return gallery
 
 class Printer:
-    def __init__(self,collector:Collector,name='',dimension=200,dimension_small=50,
+    def __init__(self,collector:Collector,name='',dimension=200,dimension_small=20,
                  border_scale=0,border_color=(0,0,0),debugging=False):
         self.project_path = collector.project_path
         self.library = collector.library
@@ -157,6 +157,8 @@ class Printer:
         
         self.debugging = debugging
 
+        self.height = 0
+        self.width = 0
         self.images = []
 
     def _find_next_name(self,folder,name,extensions,number=False):
@@ -176,6 +178,9 @@ class Printer:
       
     def store_grid(self,grid:Grid,full=False,vibrant=True,display=False):
         # store a grid result image
+        self.height = grid.height
+        self.width = grid.width
+
         if full:
             library = self.library
             dimension = self.dimension
@@ -205,10 +210,11 @@ class Printer:
         self.images[-1].save('{}/{}.{}'.format(self.project_path,save_name,extension))
 
         # save all steps as small size animation
-        gif_height,gif_width = self.images[1].size
-        #dimension_height = round(self.dimension_small)
-        #dimension_width = round(self.dimension_small/height*width)
-        imgs = [im.resize((gif_height,gif_width)) for im in self.images]
+        image_sizing = self.images[0]
+        gif_height = int(self.dimension_small * self.height)
+        gif_width = int(self.dimension_small * self.width)
+
+        imgs = [im.resize((gif_width,gif_height)) for im in self.images]
         duration = durations[0]
         repeats = durations[1]//durations[0]
         append_images = imgs[1:-1] + [imgs[-1]]*repeats
