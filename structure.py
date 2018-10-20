@@ -79,11 +79,22 @@ class Finder:
         ig_downloader.download_media()
         ### STORIES??
 
-    def _get_photos(self,folder,in_extensions=['jpg','png','bmp','gif']):
+    def _get_photos(self,folder,in_extensions=['jpg','png','bmp','gif'],crop=False):
         # find posted photos, profile or stories
         files = find_files(folder,extensions=in_extensions)
         photos = [Photo(fn) for fn in files]
+        if crop:
+            photos = [j for k in [p.crop_photo() for p in photos] for j in k]
         library = Library(photos)
+        self.library.merge_library(library)
+
+    def _get_movies(self,folder,in_extensions=['mp4'],first_only=False):
+        # find posted stories or videos
+        files = find_files(folder,extensions=in_extensions)
+        library = Library()
+        for fn in files:
+            video = Video(fn)
+            library.add_photos(video.get_photos(tick=self.tick,first_only=first_only))
         self.library.merge_library(library)
         
     def _get_pictures(self):
@@ -102,20 +113,17 @@ class Finder:
         # find stories
         print(' + stories',end='')
         sys.stdout.flush()
-        self._get_photos(self.stories_path)
-        
-    def _get_videos(self,in_extensions=['mp4']):
+        self._get_photos(self.stories_path,crop=True)
+        self._get_movies(self.stories_path,first_only=True)
+
+    def _get_videos(self):
         # find videos and turn to photos
         print(' + videos',end='')
         sys.stdout.flush()
-        files = find_files(self.videos_path,extensions=in_extensions)
-        library = Library()
-        for fn in files:
-            video = Video(fn)
-            library.add_photos(video.get_photos(tick=self.tick))
-        self.library.merge_library(library)
-
+        self._get_movies(self.videos_path)
+        
     def get_library(self):
+        # return merged libraries
         print('\n ...found {} images'.format(self.library.size()))
         return self.library
 

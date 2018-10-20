@@ -19,7 +19,7 @@ grid_dimension = 200
 grid_square = True
 grid_aspect = (19.5,9) #(1,1) # set to None to find best fit ratio
 grid_aspect_force = False
-grid_border_scale = 0 #0.05 # set to zero for no border
+grid_border_scale = 0.05 # set to zero for no border
 grid_border_color = 'white'
 grid_gif = False
 
@@ -33,7 +33,7 @@ remove_duplicates = True
 profile_size = 0 #3 # set to zero to not center on profile
 
 # how refined should the process be?
-trials = 6000
+trials = 3000
 angle_weight = 0.2
 distance_weight = 0.3
 
