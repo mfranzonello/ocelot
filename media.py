@@ -19,36 +19,33 @@ class Photo:
                 image = None
         self.image = image
 
-    def crop_photo(self,cut_range=20,threshold=240,bounds=[0.9,0.6]):
+    def crop_photo(self,cut_range=20,std_threshold=5,color_threshold=(1,1,1)):
         # see if there is a line in the middle of the photo and split image
-        # future: check to see if colors in a line have a low stddev instead of whiteness
-        white_lines = None
-        lines = []
+        mean_threshold = Color(0,0,0).difference(Color(*color_threshold))
+        scores = []
+        means = []
+        boundary = False
         image = self.image
         w,h = image.size
         # check each line from slightly above to slightly below middle
         for i in range(-cut_range,cut_range):
-            whiteness = 1-len([x for x in range(w) if sum(image.getpixel((x,int(h/2)+i)))/3 < threshold])/w
-            if whiteness > bounds[0]:
-                score = 1
-            elif whiteness < bounds[1]:
-                score = -1
-            else:
-                score = 0
-            lines.append(score)
-        # make sure lines show a big change
-        if 1 in lines:
-            line_start = lines.index(1)
-            line_end = len(lines) - lines[::-1].index(1)
-            if (line_start > 0) & (line_end < len(lines)):
-                if (lines[line_start-1] == -1) & (lines[line_end] == -1):
-                    white_lines = (line_start,line_end)
-        # if break line exists then crop photo
-        if white_lines:
+            arr = numpy.array([image.getpixel((x,int(h/2)+i)) for x in range(w)])
+            scores.append(arr.std(0).max())
+            means.append(Color(*tuple(arr.mean(0))))
+
+        # check if a boundary pattern exists
+        if (min(scores) < std_threshold) & (max(scores) >= std_threshold):
+            for s in range(1,len(scores)-1):
+                if (scores[s] < std_threshold):
+                    if max(means[s].difference(means[s-1]),
+                           means[s].difference(means[s+1])) > mean_threshold:
+                        boundary = True
+
+        # if a boundary exists then crop image
+        if boundary:
             crop_box_top = (0,0,w,int(h/2))
             crop_box_bottom = (0,int(h/2),w,h)
             photos = [Photo(self.id,image.crop(crop_box)) for crop_box in [crop_box_top,crop_box_bottom]]
-        # if no break line then return photo
         else:
             photos = [self]
 

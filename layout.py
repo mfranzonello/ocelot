@@ -250,15 +250,6 @@ class Grid:
         for cell in cells:
             self.add_cell_strength(self.cells[cell])
        
-    def get_tautness(self):
-        # find overall strength of grid
-        # -1 = all cells different from neighbors
-        # 0 = average cells half a color different
-        # 1 = all cells same as neighbors
-        safe_cells = self._safe_cells()
-        taut = 1-2*sum([self.cells[cell].strength for cell in safe_cells])/len(safe_cells)
-        return taut
-
     def worst_cells(self):
         # list cells in order of strength
         positions = self._safe_cells()
@@ -266,6 +257,16 @@ class Grid:
         worst = sort_by_list(positions,strengths,reverse=True)
         worst = [tuple(w) for w in worst]
         return worst #,strengths
+
+    def get_tautness(self,exp=5):
+        # find overall strength of grid
+        # -1 = all cells different from neighbors
+        # 0 = average cells half a color different
+        # 1 = all cells same as neighbors
+        safe_cells = self._safe_cells()
+        taut_exp = sum([self.cells[cell].strength for cell in safe_cells])/len(safe_cells)
+        taut = (exp**taut_exp-1)*(exp-1)
+        return taut
 
     def save_output(self,dimension=50,library=None,
                     secondary_scale=None,vibrant=True,border=0,border_color=(0,0,0),
