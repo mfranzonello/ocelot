@@ -69,16 +69,6 @@ class Grid:
         grid = copy.deepcopy(self)
         return self
 
-    #def _block_cells(self,positions,unblock=False):
-    #    # prevent cells from being used
-    #    for position in positions:
-    #        if not self.cell_filled(position):
-    #            self.cells[position] = Cell(None,position)
-    #        if unblock & (position in self.blocked):
-    #            self.blocked.pop(self.blocked.index(position))
-    #        else:
-    #            self.blocked.append(position)
-
     def _safe_cells(self):
         # returns unblocked cells that have images
         safe_cells = [cell for cell in self.cells if cell not in self.blocked]
@@ -289,6 +279,9 @@ class Grid:
         grid_image = Image.new('RGB',((dimension+border)*self.width,
                                       (dimension+border)*self.height),border_color)
 
+        center_block = min(self.blocked) if len(self.blocked) else None
+        
+
         for i in range(self.height):
             for j in range(self.width):
                 if self.cells[(i,j)]:
@@ -296,7 +289,7 @@ class Grid:
                     # expand the center image
                     dim_mul = 1
 
-                    if (i,j) == min(self.blocked):
+                    if (i,j) == center_block:
                         dim_mul = (max(self.blocked)[0] - min(self.blocked)[0] + 1)
                         
                     paste_secondary = None
@@ -316,7 +309,7 @@ class Grid:
 
                         if print_strength:
                             font_size = round(dimension/5)
-                            font = ImageFont.truetype('C:/Windows/Fonts/Arial.ttf',font_size) ### LINK SOMEWHERE
+                            font = ImageFont.truetype('arial.ttf',font_size) ### LINK SOMEWHERE
                             strength_text = '{:.03f}'.format(self.cells[(i,j)].strength)
                             target_text = '{}'.format(self.cells[(i,j)].picture.target)
                             rgb_text = '({},{},{})'.format(*self.cells[(i,j)].picture.color.rgb)

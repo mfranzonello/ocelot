@@ -17,8 +17,9 @@ grid_name = 'mosaic'
 grid_extension = 'jpg'
 grid_dimension = 200
 grid_square = True
-grid_aspect = (16,9) #(1,1), None
-grid_border_scale = 0.05
+grid_aspect = (19.5,9) #(1,1) # set to None to find best fit ratio
+grid_aspect_force = False
+grid_border_scale = 0 #0.05 # set to zero for no border
 grid_border_color = 'white'
 grid_gif = False
 
@@ -29,7 +30,7 @@ use_stories = True
 use_videos = True
 video_tick = 60
 remove_duplicates = True
-profile_size = 0 # set to zero to not center on profile
+profile_size = 0 #3 # set to zero to not center on profile
 
 # how refined should the process be?
 trials = 6000

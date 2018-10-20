@@ -155,7 +155,7 @@ class Collector:
 
 class Printer:
     def __init__(self,collector:Collector,name='',dimension=200,dimension_small=20,
-                 border_scale=0,border_color=(0,0,0),debugging=False):
+                 border_scale=0,border_color=(0,0,0),target_aspect=None,debugging=False):
         self.project_path = collector.project_path
         self.library = collector.library
         self.libary = collector.library
@@ -171,6 +171,10 @@ class Printer:
         self.height = 0
         self.width = 0
         self.images = []
+        if target_aspect:
+            self.target_aspect = target_aspect[0]/target_aspect[1]
+        else:
+            self.target_aspect = None
 
     def _find_next_name(self,folder,name,extensions,number=False):
         # find the next available file for a given name pattern
@@ -222,7 +226,27 @@ class Printer:
         save_name = self._find_next_name(self.project_path,self.name,extensions,number=True)
         
         # save final grid as full-size render
-        self.images[-1].save('{}/{}.{}'.format(self.project_path,save_name,extension))
+        final_image = self.images[-1]
+        if self.target_aspect:
+            current_aspect = final_image.height / final_image.width
+            # narrower than ratio means stretch width
+            if current_aspect > self.target_aspect:
+                x = 0
+                y = int(final_image.height/self.target_aspect - final_image.width)
+
+            # wider than ratio means stretch height
+            else:
+                x = int(final_image.width*self.target_aspect - final_image.height)
+                y = 0
+
+            paste_box = (int(y/2),int(x/2),int(y/2)+final_image.width,int(x/2)+final_image.height)
+            image_save = Image.new('RGB',(final_image.width+y,final_image.height+x))
+            
+            image_save.paste(final_image,paste_box)
+        else:
+            image_save = final_image
+
+        image_save.save('{}/{}.{}'.format(self.project_path,save_name,extension))
 
         # save all steps as small size animation
         if gif:

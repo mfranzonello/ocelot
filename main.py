@@ -23,8 +23,11 @@ collector.create_gallery(remove_duplicates=remove_duplicates,round_color=True,gr
                          randomize=True,stories=stories_folder,videos=videos_folder,
                          center=profile_folder if (use_profile & profile_size) else None)
 
+# set up printer
 printer = Printer(collector,name=grid_name,dimension=grid_dimension,
-                  border_scale=grid_border_scale,border_color=grid_border_color,debugging=debugging)
+                  border_scale=grid_border_scale,border_color=grid_border_color,
+                  target_aspect=grid_aspect if (grid_aspect is not None) & grid_aspect_force else None,
+                  debugging=debugging)
 
 # assemble photos
 assembler = Assembler(collector,printer,name=grid_name,aspect=grid_aspect,center_size=profile_size,

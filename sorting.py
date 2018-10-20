@@ -87,8 +87,10 @@ class Assembler(Engine):
                     height_down = math.floor(math.sqrt(n_pics*aspect_ratio))
                     width_down = math.floor(n_pics/height_up)
 
-                    deviations_down = n_pics - height_down*width_down
-                    deviations_up = n_pics - height_up*width_up
+                    deviations_down = abs(aspect_ratio - height_down/width_down)
+                    deviations_up = abs(aspect_ratio - height_up/width_up)
+                    #deviations_down = n_pics - height_down*width_down
+                    #deviations_up = n_pics - height_up*width_up
 
                     if odd is not None:
                         if width_down%2 == odd:

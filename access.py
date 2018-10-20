@@ -157,7 +157,7 @@ class IGDownloader:
                 save_name = '{}.{}'.format(id,ext)
                 
                 # check if already downloaded
-                if save_name not in files:
+                if '{}/{}'.format(path,save_name) not in files:
                     # save url image or video to folder
                     r = requests.get(url)
 

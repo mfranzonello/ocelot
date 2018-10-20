@@ -3,11 +3,12 @@ import math
 import numpy
 import os
 
-def find_files(folder,extensions=['']):
+def find_files(folder,extensions=None):
     # find files in a subfolder with an extension
-    files = []
     folders = [fold[0] for fold in os.walk(folder)]
-    files += [fl+'/'+fn for fl in folders for fn in os.listdir(fl) if (any('.'+ext in fn for ext in extensions))]
+    files = [fl+'/'+fn for fl in folders for fn in os.listdir(fl)]
+    if extensions:
+        files = [fn for fn in files if (any('.'+ext in fn for ext in extensions))]
     return files
 
 def sort_by_list(input,rank_list,reverse=False):
