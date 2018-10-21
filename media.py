@@ -1,7 +1,6 @@
 ### MEDIA OBJECTS ###
 from common import *
 from coloring import *
-
 from PIL import Image,ImageChops
 import cv2
 

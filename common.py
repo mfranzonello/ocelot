@@ -32,3 +32,4 @@ def angle_difference(angle1,angle2):
     diff = min(abs(angle1 - angle2),abs(angle2 - angle1))
     diff = min(diff,2*math.pi - diff)
     return diff
+
