@@ -1,5 +1,6 @@
 ### COLOR OBJECTS ###
 from common import *
+from plotting import *
 import math
 import random
 import colorsys
@@ -12,7 +13,7 @@ class Color:
         self.blue = blue
         self.rgb = (self.red,self.green,self.blue)
         self.hsv = colorsys.rgb_to_hsv(self.red,self.green,self.blue)
-        self.angle = angle_simplified(self.hsv[0] * 2*math.pi)
+        self.angle = CoordinateSystem.angle_simplified(self.hsv[0] * 2*math.pi)
 
     def __repr__(self):
         string = 'R{:03}|G{:03}|B{:03}'.format(self.red,self.green,self.blue)

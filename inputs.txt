@@ -2,7 +2,7 @@
 
 # where is the project located?
 path = 'C:/Users/mfran/OneDrive/Projects/mf_traveler_20181013'
-ig_username = 'mf_traveler'
+ig_username = None #'mf_traveler'
 
 # how is the project structured?
 photos_folder = 'photos'
@@ -16,7 +16,7 @@ out_folder = 'mosaics'
 grid_name = 'mosaic'
 grid_extension = 'jpg'
 grid_dimension = 200
-grid_square = True
+grid_shape = 'hexagonal' # 'rectangular'
 grid_aspect = (19.5,9) #(1,1) # set to None to find best fit ratio
 grid_aspect_force = False
 grid_border_scale = 0.05 # set to zero for no border
@@ -33,7 +33,7 @@ remove_duplicates = True
 profile_size = 0 #3 # set to zero to not center on profile
 
 # how refined should the process be?
-trials = 3000
+trials = 500 #3000
 angle_weight = 0.2
 distance_weight = 0.3
 

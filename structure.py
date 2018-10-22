@@ -4,24 +4,129 @@ from coloring import *
 from media import *
 from access import *
 from layout import *
+from plotting import *
 import time
 import sys
 import os
 
 class Project:
-    def __init__(self,project_path,photos_path,profile_path=False,stories_path=False,videos_path=False,
-                 ig_username=None,download_path='downloads'):
-        self.project_path = project_path
-        self.photos_path = photos_path
-        self.profile_path = profile_path
-        self.stories_path = stories_path
-        self.videos_path = videos_path
-        self.username = ig_username
-        self.download_path = download_path
+    # read in inputs.txt and create variables
+    def __init__(self,inputs_file='inputs.txt',
+                 debugging=False,angle_weight=0.2,distance_weight=0.3,print_after=1000,secondary_scale=1/3):
+
+        tweak_split = '='
+        parameters = {}
+        f = open(inputs_file,'r')
+        for line in f:
+            if (line[0] != '#') & (tweak_split in line):
+                keyvalue = [text.strip() for text in line.split(tweak_split)]
+                if len(keyvalue) == 2:
+                    key,value = keyvalue
+                    parameters[key] = self._get_value(value)
+        f.close()
+
+        # inputs
+        # where is the project located
+        self.path = parameters.get('path')
+        self.ig_username = parameters.get('ig_username')
+
+        # how is the project structured?
+        self.photos_folder = parameters.get('photos_folder')
+        self.profile_folder = parameters.get('profile_folder')
+        self.stories_folder = parameters.get('stories_folder')
+        self.videos_folder = parameters.get('videos_folder')
+        self.downloads_folder = parameters.get('downloads_folder')
+        self.out_folder = parameters.get('out_folder')
+
+        # how should the output look?
+        self.grid_name = parameters.get('grid_name')
+        self.grid_extension = parameters.get('grid_extension')
+        self.grid_dimension = parameters.get('grid_dimension')
+        self.grid_shape = parameters.get('grid_shape')
+        self.grid_aspect = parameters.get('grid_aspect')
+        self.grid_aspect_force = parameters.get('grid_aspect_force')
+        self.grid_border_scale = parameters.get('grid_border_scale')
+        self.grid_border_color = parameters.get('grid_border_color')
+        self.grid_gif = parameters.get('grid_gif')
+
+        # what content should be used?
+        self.check_ig = parameters.get('check_ig')
+        self.use_profile = parameters.get('use_profile')
+        self.use_stories = parameters.get('use_stories')
+        self.use_videos = parameters.get('use_videos')
+        self.video_tick = parameters.get('video_tick')
+        self.remove_duplicates = parameters.get('remove_duplicates')
+        self.profile_size = parameters.get('profile_size')
+
+        # how refined should the process be?
+        self.trials = parameters.get('trials')
+        self.angle_weight = 0.2
+        self.distance_weight = 0.3
+        
+        # should the intermediate steps be saved?
+        self.print_after = print_after
+        self.secondary_scale = secondary_scale
+
+        # special mode
+        self.debugging = debugging
+        self.parameters = parameters
+
+        # project specific
+        self.project_path = '{}/{}'.format(self.path,self.out_folder)
+        self.photos_path = '{}/{}'.format(self.path,self.photos_folder)
+        self.profile_path = '{}/{}'.format(self.path,self.profile_folder) if self.use_profile else False
+        self.stories_path = '{}/{}'.format(self.path,self.stories_folder) if self.use_stories else False
+        self.videos_path = '{}/{}'.format(self.path,self.videos_folder) if self.use_videos else False
+        self.username = self.ig_username if self.check_ig else None
+        self.download_path = self.downloads_folder
 
         self.start_time = self._timer()
         self.iterations = 0
         self.results = []
+
+    def _get_value(self,string):
+        # remove end comments, apostrophes and extra spaces
+        if '#' in string:
+            string = string[:string.index('#')]
+        if string[0] == '\'' and string.rfind('\'') > 0:
+            string = string[1:string.rfind('\'')]
+        string = string.strip()
+
+        # tuples
+        if type(string) is tuple:
+            value = string
+        elif all(char in string for char in ['(',',',')']):
+            value = self._get_tuple(string)
+
+        # numbers
+        elif string.isdigit():
+            value = int(string)
+        elif all((s.isnumeric() for s in string if s != '.')):
+            value = float(string)
+        elif '/' in string:
+            value = self._get_fraction(string)
+
+        # booleans, None and strings
+        else:
+            value = {'True':True,'False':False,'None':None}.get(string,string)
+
+        return value
+
+    def _get_tuple(self,string):
+        # tuples (X,Y,...)
+        value = tuple(self._get_value(v) for v in string[1:-1].split(','))
+        return value
+
+    def _get_fraction(self,string):
+        # fractional values X/Y
+        numden = string.split('/')
+        if (len(numden) == 2) and (numden[0].isnumeric() & numden[1].isnumeric()):
+            numerator,denominator = numden
+            value = float(numerator)/float(denominator)
+        else:
+            value = string
+
+        return value
 
     def _timer(self,last_time=None):
         # mark time and return time from previous timer
@@ -33,6 +138,7 @@ class Project:
         return current_time,time_elapsed
 
     def add_result(self,period:str,result:float):
+        # update project
         if period == 'iterations':
             self.iterations = result
         else:
@@ -40,48 +146,55 @@ class Project:
         return
 
     def summarize(self):
+        # print project results
         end_time = self._timer(self.start_time)
         print('Ran {} iterations'.format(self.iterations))
         for result in self.results:
             print('{} strength: {:0.2%}'.format(result[0],result[1]))
         print('Elapsed time: {} min {} sec'.format(int(end_time[1]/60),round(end_time[1]%60)))
 
+
 class Finder:
-    def __init__(self,project:Project,tick=30):
-        self.project_path = project.project_path
-        self.photos_path = project.photos_path
-        self.profile_path = project.profile_path
-        self.stories_path = project.stories_path
-        self.videos_path = project.videos_path
-        self.tick = tick
-        self.username = project.username
-        self.download_path = project.download_path
+    # finds media to use and coverts to images
+    def __init__(self,project:Project):
+        self.project = project
+        #self.project_path = project.project_path
+        #self.photos_path = project.photos_path
+        #self.profile_path = project.profile_path
+        #self.stories_path = project.stories_path
+        #self.videos_path = project.videos_path
+        #self.tick = project.video_tick
+        #self.username = project.username
+        #self.download_path = project.download_path
 
         self.library = Library()
 
-        if self.username:
+    def find(self):
+        # look for files and links and convert
+        if self.project.username:
             self._check_ig()
 
         print('Looking for files...')
         self._get_pictures()
-        if self.profile_path:
+        if self.project.profile_path:
             self._get_profile()
-        if self.stories_path:
+        if self.project.stories_path:
             self._get_stories()
-        if self.videos_path:
+        if self.project.videos_path:
             self._get_videos()
 
     def _check_ig(self):
         # look if new media is in instagram
-        ig_user = IGAccount('mf_traveler')
-        ig_downloader = IGDownloader(ig_user,photos_path=self.photos_path,videos_path=self.videos_path,
-                                     profile_path=self.profile_path,download_path=self.download_path)
+        ig_user = IGAccount(self.project.username)
+        ig_user.ping()
+        ig_downloader = IGDownloader(ig_user,photos_path=self.project.photos_path,videos_path=self.project.videos_path,
+                                     profile_path=self.project.profile_path,download_path=self.project.download_path)
         ig_downloader.download_media()
         ### STORIES??
 
     def _get_photos(self,folder,in_extensions=['jpg','png','bmp','gif'],crop=False):
         # find posted photos, profile or stories
-        files = find_files(folder,extensions=in_extensions)
+        files = Common.find_files(folder,extensions=in_extensions)
         photos = [Photo(fn) for fn in files]
         if crop:
             photos = [j for k in [p.crop_photo() for p in photos] for j in k]
@@ -90,37 +203,37 @@ class Finder:
 
     def _get_movies(self,folder,in_extensions=['mp4'],first_only=False):
         # find posted stories or videos
-        files = find_files(folder,extensions=in_extensions)
+        files = Common.find_files(folder,extensions=in_extensions)
         library = Library()
         for fn in files:
             video = Video(fn)
-            library.add_photos(video.get_photos(tick=self.tick,first_only=first_only))
+            library.add_photos(video.get_photos(tick=self.project.video_tick,first_only=first_only))
         self.library.merge_library(library)
         
     def _get_pictures(self):
         # find posted photos
         print(' ...checking photos',end='')
         sys.stdout.flush()
-        self._get_photos(self.photos_path)
+        self._get_photos(self.project.photos_path)
         
     def _get_profile(self):
         # find profile pic
         print(' + profile',end='')
         sys.stdout.flush()
-        self._get_photos(self.profile_path)
+        self._get_photos(self.project.profile_path)
         
     def _get_stories(self):
         # find stories
         print(' + stories',end='')
         sys.stdout.flush()
-        self._get_photos(self.stories_path,crop=True)
-        self._get_movies(self.stories_path,first_only=True)
+        self._get_photos(self.project.stories_path,crop=True)
+        self._get_movies(self.project.stories_path,first_only=True)
 
     def _get_videos(self):
         # find videos and turn to photos
         print(' + videos',end='')
         sys.stdout.flush()
-        self._get_movies(self.videos_path)
+        self._get_movies(self.project.videos_path)
         
     def get_library(self):
         # return merged libraries
@@ -131,7 +244,9 @@ class Collector:
     def __init__(self,finder:Finder):
         self.library = finder.get_library()
         self.gallery = None
-        self.project_path = finder.project_path
+        self.project = finder.project
+        #self.project_path = finder.project_path
+        self.coordinate_system = None
         print('\nAnalyzing images...')
 
     def _remove_duplicates(self):
@@ -143,8 +258,9 @@ class Collector:
 
     def create_gallery(self,remove_duplicates=True,round_color=True,grey_pct=0.75,dark_pct=0.6,
                     grey_threshold=16,dark_threshold=100,round_threshold=16,dimension=50,aspect=None,
-                    randomize=True,stories='stories',videos='videos',center=None):
+                    randomize=True,stories='stories',videos='videos',center=None,lattice=None):
         
+        self.coordinate_system = CoordinateSystem(lattice)
         if remove_duplicates:
             library = self._remove_duplicates()
         else:
@@ -153,7 +269,7 @@ class Collector:
         gallery = Gallery.from_library(library,round_color=round_color,grey_pct=grey_pct,dark_pct=dark_pct,
                                        grey_threshold=grey_threshold,dark_threshold=dark_threshold,round_threshold=round_threshold,
                                        dimension=dimension,aspect=aspect,randomize=randomize,stories=stories,videos=videos,
-                                       center=center)
+                                       center=center,coordinate_system=self.coordinate_system)
 
         self.gallery = gallery
 
@@ -164,7 +280,7 @@ class Collector:
 class Printer:
     def __init__(self,collector:Collector,name='',dimension=200,dimension_small=20,
                  border_scale=0,border_color=(0,0,0),target_aspect=None,debugging=False):
-        self.project_path = collector.project_path
+        self.project = collector.project #_path = collector.project_path
         self.library = collector.library
         self.libary = collector.library
 
@@ -173,11 +289,17 @@ class Printer:
         self.dimension_small = dimension_small
         self.border_scale = border_scale
         self.border_color = border_color
-        
+
+        self.coordinate_system = collector.coordinate_system
+        self.coordinate_matrix = None
+        self.lattice = self.coordinate_system.lattice
+
         self.debugging = debugging
 
         self.height = 0
         self.width = 0
+        self.width2 = 0
+
         self.images = []
         if target_aspect:
             self.target_aspect = target_aspect[0]/target_aspect[1]
@@ -198,12 +320,15 @@ class Printer:
             n += 1
             name_try = '{}_{:02}'.format(name,n)
         return name_try
+
+    def add_matrix(self,matrix):
+        # add a matrix to the coordinate system
+        self.coordinate_matrix = CoordinateSystem(lattice=self.lattice,matrix=matrix)
       
     def store_grid(self,grid:Grid,full=False,vibrant=True,display=False):
         # store a grid result image
-        self.height = grid.height
-        self.width = grid.width
 
+        # print imags at full resolution
         if full:
             library = self.library
             dimension = self.dimension
@@ -211,6 +336,8 @@ class Printer:
             border_color = self.border_color
             secondary_scale = False
             print_strength = False
+
+        # print colors only
         else:
             library = None
             dimension = self.dimension_small
@@ -231,7 +358,7 @@ class Printer:
         if gif:
             gif_extension = 'gif'
             extensions.append(gif_extension)
-        save_name = self._find_next_name(self.project_path,self.name,extensions,number=True)
+        save_name = self._find_next_name(self.project.project_path,self.name,extensions,number=True)
         
         # save final grid as full-size render
         final_image = self.images[-1]
@@ -254,7 +381,7 @@ class Printer:
         else:
             image_save = final_image
 
-        image_save.save('{}/{}.{}'.format(self.project_path,save_name,extension))
+        image_save.save('{}/{}.{}'.format(self.project.project_path,save_name,extension))
 
         # save all steps as small size animation
         if gif:
@@ -267,7 +394,7 @@ class Printer:
             repeats = durations[1]//durations[0]
             append_images = imgs[1:-1] + [imgs[-1]]*repeats
 
-            imgs[0].save('{}/{}.{}'.format(self.project_path,save_name,gif_extension),
+            imgs[0].save('{}/{}.{}'.format(self.project.project_path,save_name,gif_extension),
                             save_all=True,duration=duration,append_images=append_images,loop=0)
 
-        os.startfile(self.project_path)
+        os.startfile(self.project.project_path)

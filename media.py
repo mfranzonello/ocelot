@@ -1,8 +1,11 @@
 ### MEDIA OBJECTS ###
 from common import *
 from coloring import *
-from PIL import Image,ImageChops
+from plotting import *
+#from operator import itemgetter
+from PIL import Image,ImageChops,ImageDraw
 import cv2
+import numpy
 
 class Photo:
     # image with an id
@@ -85,6 +88,8 @@ class Library:
         if photos is not None:
             self.add_photos(photos)
 
+#        self._arange = numpy.arange(256) # length of colors in RGB bands
+
     def add_photo(self,photo:Photo):
         # add a photo to library
         if photo.id not in self.photos:
@@ -104,7 +109,10 @@ class Library:
         self.photos.update(library.photos)
 
     def purge(self,dimension=10,threshold=0.9,greys=50):
+#    def purge(self,dimension=10,color_threshold=16,difference_threshold=0.9,greys=50):
         # remove duplicate photos based on pixel content
+        ## FUTURE IDEA: split into RGB and sort by histograms
+        ## only compare photos to other photos with similar range histograms
         dimensions = (dimension,dimension)
         size = dimension**2
         photos = self.photos.copy()
@@ -129,6 +137,66 @@ class Library:
         print(' ...verified 100% ')
 
         purge_count = len(self.photos) - len(uniques) #len(photos)
+        #print('RESIZING1')
+        #images = [print(p) if print(p) is not None else (p,self.photos[p].image.resize(dimensions)) for p in self.photos]
+        #print('RESIZING2')
+        ##uniques = []
+
+        #averages = -numpy.ones([len(images),4],dtype=int) # empty array to store RGB
+        
+        #for i in range(len(images)):
+        #    unique = True
+        #    id = images[i][0]
+        #    image = images[i][1]
+        #    RGBs = [numpy.array(im.histogram()) for im in image.split()] # get RGB histograms
+        #    photoRGB = [arr.dot(self._arange)/arr.sum() for arr in RGBs] # get average RGB
+        #    similar_images = averages[(abs(averages[:,1] - photoRGB[0]) < color_threshold) & 
+        #                              (abs(averages[:,2] - photoRGB[1]) < color_threshold) & 
+        #                              (abs(averages[:,3] - photoRGB[2]) < color_threshold)] # compare RGB content for similar photos
+
+
+
+        #    # look at differences only for similar photos
+        #    while unique & (n < len(similar_images)):
+        #        similar_image = images[similar_images[n,0]][1]
+
+        #        negatives = max([sum(neg.histogram()[0:greys])/size for neg in ImageChops.difference(image,similar_image).split()])
+
+        #        if negatives > difference_threshold/3:
+        #            unique = False
+        #        else:
+
+        #    if unique:
+        #        averages[i,:] = [1] + photoRGB # store averages 
+
+        #    analyzed = i/len(images)
+        #    print(' ...verified {:0.1%}'.format(analyzed),end='\r')
+
+        #uniques = numpy.where(averages[:,0]==1)[0]
+        #print(len(uniques))
+        ##print(type(uniques))
+        #input('BREAK')
+        ##.tolist()
+        #photos = {images[i][0]:self.photos[images[i][0]] for i in uniques}
+
+        #    #diff = 0
+        #    #n = 0
+        #    #if len(uniques) > 0:
+        #    #    while (diff < threshold) & (n < len(uniques)):
+        #    #        diff = max(diff,sum(ImageChops.difference(image,uniques[n]).histogram()[0:greys])/size) ## WARNING! this might be looking at red pixels only
+        #    #        n += 1
+
+        #    #if diff >= threshold:
+        #    #    photos.pop(photo)
+        #    #else:
+        #    #    uniques.append(image)
+
+        #    #analyzed = list(self.photos.keys()).index(photo)/len(self.photos)
+        #    #print(' ...verified {:0.1%}'.format(analyzed),end='\r')
+
+        #print(' ...verified 100% ')
+
+        #purge_count = len(self.photos) - len(photos) #len(uniques)
         self.photos = photos
 
         return purge_count
@@ -296,7 +364,7 @@ class Picture:
 
 class Gallery:
     # collection of colors with order
-    def __init__(self,pictures,randomize=True,stories='stories',videos='videos',center=None):
+    def __init__(self,pictures,randomize=True,stories='stories',videos='videos',center=None,coordinate_system=CoordinateSystem()):
         self.center = None
         if center:
             if center in pictures:
@@ -306,6 +374,8 @@ class Gallery:
                 if len(center_pics):
                     self.center = center_pics[0]
             pictures = [p for p in pictures if p != self.center]
+
+        self.CS = coordinate_system
 
         if randomize:
             pictures1 = [p for p in pictures if not any((self._folder_in_id(stories,p.id),self._folder_in_id(videos,p.id)))]
@@ -332,7 +402,7 @@ class Gallery:
 
     def from_library(library,round_color=False,grey_pct=100,dark_pct=100,
                      grey_threshold=16,dark_threshold=100,round_threshold=16,
-                     dimension=0,aspect=(1,1),randomize=True,stories='stories',videos='videos',center=None):
+                     dimension=0,aspect=(1,1),randomize=True,stories='stories',videos='videos',center=None,coordinate_system=CoordinateSystem()):
         # construct a gallery from a library
         pixelation = [Pixelation(library.get_photo(photo),round_color=round_color,
                                  grey_pct=grey_pct,dark_pct=dark_pct,
@@ -342,7 +412,7 @@ class Gallery:
         pictures = [Picture(px.id,px.prominent_color(),
                             secondary=px.secondary_color(),
                             greyscale=px.prominent_color(vibrant=False)) for px in pixelation]
-        gallery = Gallery(pictures,randomize=randomize,stories=stories,videos=videos,center=center)
+        gallery = Gallery(pictures,randomize=randomize,stories=stories,videos=videos,center=center,coordinate_system=coordinate_system)
     
         print('\n')
     
@@ -360,7 +430,7 @@ class Gallery:
         h,s,v = color.hsv
         if len(hues) > 0:
             h = hues.index(h)/len(hues)
-        H = angle_simplified(h * 2*math.pi + angle)
+        H = CoordinateSystem.angle_simplified(h * 2*math.pi + angle)
         S = s
         V = v/255
         R = 0.375
@@ -370,8 +440,11 @@ class Gallery:
         if dark:
             S = 1
 
-        x = max(0,min(1, R * math.cos(H) * S * (2-V)**2 + 0.5))
-        y = max(0,min(1, R * math.sin(H) * S * (2-V)**2 + 0.5))
+        x,y = self.CS.from_polar(R*s*(2-V)**2,H)
+        x = max(0,x+0.5)
+        y = max(0,y+0.5)
+        #x = max(0,min(1, R * math.cos(H) * S * (2-V)**2 + 0.5))
+        #y = max(0,min(1, R * math.sin(H) * S * (2-V)**2 + 0.5))
         
         return (x,y),dark,H
 
@@ -390,14 +463,13 @@ class Gallery:
         vibrant_hues = []
 
         # place at an angle
-        angle = angle_simplified(random.random()*2*math.pi)
-        self.angle = angle_simplified(angle)
-
+        self.angle = CoordinateSystem.angle_simplified(random.random()*2*math.pi)
+        
         hues = sorted([picture.color.hsv[0] for picture in self.pictures])
 
         for picture in self.pictures:
             # get corner and darkness
-            self.corners[picture.id],dark,H = self.get_hsv_corner(picture.color,angle=angle,hues=hues)
+            self.corners[picture.id],dark,H = self.get_hsv_corner(picture.color,angle=self.angle,hues=hues)
             self.pictures[self.pictures.index(picture)].angle = H
             # order pictures based on darkness
             if dark:
@@ -407,8 +479,8 @@ class Gallery:
                 sorted_vibrant.append(picture)
                 vibrant_hues.append(H)
     
-        sorted_dark = sort_by_list(sorted_dark,dark_hues)
-        sorted_vibrant = sort_by_list(sorted_vibrant,vibrant_hues)
+        sorted_dark = Common.sort_by_list(sorted_dark,dark_hues)
+        sorted_vibrant = Common.sort_by_list(sorted_vibrant,vibrant_hues)
 
         sorted_order = sorted_dark + self.cycle_list(sorted_vibrant,6)
 
@@ -417,4 +489,56 @@ class Gallery:
         sorted_videos = [p for p in self.pictures if '/{}/'.format(videos) in p.id]
         sorted_order = sorted_pics + sorted_stories + sorted_videos
 
-        self.pictures = sorted_order    
+        self.pictures = sorted_order
+
+class Shaper:
+    # manipulations to an image
+    def shape(image:Image,shape):
+        # cut an image to a shape
+        ratios = {'hexagon':math.sqrt(3)/2,
+                  'circle':1}
+        w,h = image.size
+        dim = min(w,h)
+        ratio = ratios[shape]
+        if h != w:
+            m = min(h,w)/2
+            image = image.crop((int(w/2-ratio*m),int(h/2-m),int(w/2+ratio*m),int(h/2+m)))
+        
+        dim1 = int(dim)
+        dim2 = int(dim*ratio)
+
+        patterns = {'hexagon':[(0,round(dim1/4)),
+                               (0,round(3*dim1/4)),
+                               (round(dim2/2),dim1),
+                               (dim2,round(3*dim1/4)),
+                               (dim2,round(dim1/4)),
+                               (round(dim2/2),0)],
+                    'circle':[0,0,dim1,dim1]}
+        pattern = patterns[shape]
+
+        # convert to numpy and create mask
+        imArray = numpy.asarray(image.convert('RGBA'))
+        maskIm = Image.new('L',(imArray.shape[1],imArray.shape[0]),0)
+        if shape == 'hexagon':
+            ImageDraw.Draw(maskIm).polygon(pattern,outline=1,fill=1)
+        elif shape == 'circle':
+            ImageDraw.Draw(maskIm).ellipse(pattern,outline1=1,fill=1)
+        mask = numpy.array(maskIm)
+
+        # assemble new image (uint8: 0-255)
+        newImArray = numpy.empty(imArray.shape,dtype='uint8')
+        newImArray[:,:,:3] = imArray[:,:,:3] # colors (three first columns, RGB)
+        newImArray[:,:,3] = mask*255 # transparency (4th column)
+
+        shaped = Image.fromarray(newImArray,'RGBA')
+        shaped.resize((int(w/ratio),int(h/ratio)),Image.ANTIALIAS)
+        return shaped
+
+    def blot(image:Image):
+        # turn transparency to white:
+        imArray = numpy.copy(numpy.asarray(image.convert('RGBA')))
+        r,g,b,a = numpy.moveaxis(imArray,-1,0) #rollaxis(imArray,axis=-1)
+        r[a==0],g[a==0],b[a==0] = (255,255,255)
+        newImArray = numpy.dstack([r,g,b,a])
+        blotted = Image.fromarray(newImArray,'RGBA').convert('RGB')
+        return blotted

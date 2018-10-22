@@ -12,6 +12,8 @@ class Engine:
         self.grid = None
         self.printer = printer
         self.print_gif = print_gif
+        self.coordinate_system = printer.coordinate_system
+        self.coordinate_matrix = None
 
     def store_grid(self,dimension=50,full=False,extension='jpg'):
         self.printer.store_grid(self.grid,full=full)
@@ -37,11 +39,20 @@ class Assembler(Engine):
         gallery = collector.get_gallery()
         # if the gallery didn't turn up a center image, then don't pass center
         center_size = center_size if gallery.center else 0
-        height,width,center_size = self._best_fit(gallery.size,aspect,center_size=center_size)
-        used = int(height*width-center_size**2 + (center_size>0))
-        print(' ...using {} of {} images for {}x{} grid'.format(used,gallery.size,height,width))
+        height,width,width2,center_size = self._best_fit(gallery.size,aspect,center_size=center_size)
+
+        # add dimensions to the printer
+        matrix = (height,width) if width2 == 0 else (height,width,width2)
+        self.printer.add_matrix(matrix)
+        self.coordinate_matrix = printer.coordinate_matrix
+
+        n_total = self.coordinate_matrix.n_total()
+        center_total = self.coordinate_matrix.ring_size(width=center_size)
+        used = int(n_total - center_total + (center_size>0))
+        print(' ...using {} of {} images for {}x{} grid'.format(used,gallery.size,height,max(width,width2)))
         
-        self.grid = Grid(height,width,distance_weight=distance_weight,angle_weight=angle_weight)
+        self.grid = Grid(height,width,width2,distance_weight=distance_weight,angle_weight=angle_weight,
+                         coordinate_system=self.coordinate_system)
         self.grid.add_center(center_size=center_size)
         self.grid.add_from_gallery(gallery)
 
@@ -54,21 +65,25 @@ class Assembler(Engine):
         # an even width means the center must also be even
         # an odd width means the center must also be odd
 
+        width2 = 0
+        ## ADD SPECIAL CASE FOR HEXAGONAL COORDINATES WITH WIDTH2 BEING ODD ROWS
+        ## ADJUST ASPECT RATIO TO HEXAGONAL COORDINATES
+
         # if a center size is given, find if even or odd sizing is better
         if center_size > 0:
             center_size_even = round((center_size)/2,0)*2
             center_size_odd = round((center_size-1)/2,0)*2+1
             n_pics_even = n_pics + center_size_even**2
             n_pics_odd = n_pics + center_size_odd**2
-            height_even,width_even,_ = self._best_fit(n_pics_even,aspect=aspect,odd=False)
-            height_odd,width_odd,_ = self._best_fit(n_pics_odd,aspect=aspect,odd=True)
+            height_even,width_even,_,_ = self._best_fit(n_pics_even,aspect=aspect,odd=False)
+            height_odd,width_odd,_,_ = self._best_fit(n_pics_odd,aspect=aspect,odd=True)
 
             deviations_even = n_pics_even - height_even*width_even
             deviations_odd = n_pics_odd - height_odd*width_odd
             if deviations_even < deviations_odd:
-                height,width,center_size = height_even,width_even,center_size_even
+                height,width,_,center_size = height_even,width_even,center_size_even
             else:
-                height,width,center_size = height_odd,width_odd,center_size_odd
+                height,width,_,center_size = height_odd,width_odd,center_size_odd
 
         # no center size given or center size added to n_pics for recursion
         else:
@@ -89,8 +104,6 @@ class Assembler(Engine):
 
                     deviations_down = abs(aspect_ratio - height_down/width_down)
                     deviations_up = abs(aspect_ratio - height_up/width_up)
-                    #deviations_down = n_pics - height_down*width_down
-                    #deviations_up = n_pics - height_up*width_up
 
                     if odd is not None:
                         if width_down%2 == odd:
@@ -122,7 +135,7 @@ class Assembler(Engine):
                 if len(deviations)>0:
                     height,width = sizes[deviations.index(min([d for d in deviations if d>=0]))]
 
-        return height,width,center_size
+        return height,width,width2,center_size
 
 class Sorter(Engine):
     # engine that can improve color matching in a grid
@@ -138,6 +151,7 @@ class Sorter(Engine):
         taut_0 = self.grid.get_tautness()
         grid = self.grid.reseed()
         self.grid = grid
+
         taut_1 = self.grid.get_tautness()
         print(' ...{:0.2%} to {:0.2%} strength'.format(taut_0,taut_1))
 

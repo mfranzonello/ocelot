@@ -1,53 +1,56 @@
 ### MAIN SCRIPT ###
 from sorting import *
-from inputs import *
+#from inputs import *
 
 print('*** OCELOT V2.5 ***\n')
 
 # assemble folders
-project = Project(project_path = '{}/{}'.format(path,out_folder),
-                  photos_path='{}/{}'.format(path,photos_folder),
-                  profile_path='{}/{}'.format(path,profile_folder) if use_profile else False,
-                  stories_path = '{}/{}'.format(path,stories_folder) if use_stories else False,
-                  videos_path = '{}/{}'.format(path,videos_folder) if use_videos else False,
-                  ig_username=ig_username if check_ig else None,
-                  download_path=downloads_folder)
+project = Project()
+
+                  #project_path = '{}/{}'.format(path,out_folder),
+                  #photos_path='{}/{}'.format(path,photos_folder),
+                  #profile_path='{}/{}'.format(path,profile_folder) if use_profile else False,
+                  #stories_path = '{}/{}'.format(path,stories_folder) if use_stories else False,
+                  #videos_path = '{}/{}'.format(path,videos_folder) if use_videos else False,
+                  #ig_username=ig_username if check_ig else None,
+                  #download_path=downloads_folder)
 
 # get all media
-finder = Finder(project,tick=video_tick)
+finder = Finder(project)
+finder.find()
 
 # reduce to colors
 collector = Collector(finder)
-collector.create_gallery(remove_duplicates=remove_duplicates,round_color=True,grey_pct=0.75,dark_pct=0.6,
-                         grey_threshold=16,dark_threshold=100,round_threshold=16,dimension=50,aspect=grid_aspect,
-                         randomize=True,stories=stories_folder,videos=videos_folder,
-                         center=profile_folder if (use_profile & profile_size) else None)
+collector.create_gallery(remove_duplicates=project.remove_duplicates,round_color=True,grey_pct=0.75,dark_pct=0.6,
+                         grey_threshold=16,dark_threshold=100,round_threshold=16,dimension=50,aspect=project.grid_aspect,
+                         randomize=True,stories=project.stories_folder,videos=project.videos_folder,
+                         center=project.profile_folder if (project.use_profile & project.profile_size) else None,lattice=project.grid_shape)
 
 # set up printer
-printer = Printer(collector,name=grid_name,dimension=grid_dimension,
-                  border_scale=grid_border_scale,border_color=grid_border_color,
-                  target_aspect=grid_aspect if (grid_aspect is not None) & grid_aspect_force else None,
-                  debugging=debugging)
+printer = Printer(collector,name=project.grid_name,dimension=project.grid_dimension,
+                  border_scale=project.grid_border_scale,border_color=project.grid_border_color,
+                  target_aspect=project.grid_aspect if (project.grid_aspect is not None) & project.grid_aspect_force else None,
+                  debugging=project.debugging)
 
 # assemble photos
-assembler = Assembler(collector,printer,name=grid_name,aspect=grid_aspect,center_size=profile_size,
-                      secondary_scale=secondary_scale,
-                      distance_weight=distance_weight,angle_weight=angle_weight,print_gif=grid_gif)
+assembler = Assembler(collector,printer,name=project.grid_name,aspect=project.grid_aspect,center_size=project.profile_size,
+                      secondary_scale=project.secondary_scale,
+                      distance_weight=project.distance_weight,angle_weight=project.angle_weight,print_gif=project.grid_gif)
 project.add_result('initial',assembler.get_strength())
 
 # seed by color
-sorter = Sorter(assembler,print_after=print_after)
+sorter = Sorter(assembler,print_after=project.print_after)
 sorter.reseed()
 project.add_result('reseed',sorter.get_strength())
 
 # improve assembly
-sorter.swap_worst(trials=trials)
+sorter.swap_worst(trials=project.trials)
 sorter.finalize()
 project.add_result('iterations',sorter.n_trials)
 project.add_result('final',sorter.get_strength())
 
 # finish and print
-printer.finalize(grid_extension,gif=grid_gif)
+printer.finalize(project.grid_extension,gif=project.grid_gif)
 
 # summarize results
 project.summarize()

@@ -34,6 +34,8 @@ class IGAccount:
         self.endpoint = IGAuthentications.get_endpoint('media')
         self.parameters = IGAuthentications.get_token(self.username)
 
+    def ping(self):
+        # contact Instagram API and get urls
         ok = True
         jason = None
         print('Contacting Instagram API')
@@ -142,7 +144,11 @@ class IGDownloader:
         print(' ...downloading new media')
 
         # check what videos already exists
-        videos = find_files(self.paths['videos']['path'],[self.paths['videos']['path']])
+        collect_profile = (self.paths['profile']['path'] is not False)
+        collect_videos = (self.paths['videos']['path'] is not False)
+
+        if collect_videos:
+            videos = Common.find_files(self.paths['videos']['path'],[self.paths['videos']['path']])
         
         for media in self.urls:
             path = '{}/{}'.format(self.paths[media]['path'],self.download_path)
@@ -153,7 +159,7 @@ class IGDownloader:
             # get file naming
             for id in self.urls[media]: 
                 url = self.urls[media][id]
-                files = find_files(path)
+                files = Common.find_files(path)
                 save_name = '{}.{}'.format(id,ext)
                 
                 # check if already downloaded
@@ -163,10 +169,11 @@ class IGDownloader:
 
                     # if file is a video, check if it has already been downloaded
                     save_file = True
-                    if media == 'videos':
+                    if collect_videos & (media == 'videos'):
                         save_file = self._compare_files(r.content,videos)
 
                     if save_file:
-                        save_path = '{}/{}.{}'.format(path,id,ext)
-                        with open(save_path, 'wb') as f:  
-                            f.write(r.content)
+                        if (media == 'images') | ((media == 'videos') & collect_videos) | ((media == 'profile') & collect_profile):
+                            save_path = '{}/{}.{}'.format(path,id,ext)
+                            with open(save_path, 'wb') as f:  
+                                f.write(r.content)
