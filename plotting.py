@@ -2,7 +2,7 @@
 import math
 
 class CoordinateSystem:
-    def __init__(self,lattice=None,matrix=False,even=False):
+    def __init__(self,lattice=None,matrix=False,even=False,orientation=None):
         # cartesian: (x,y)
         # hexagonal: (x,y,z=-(x+y))
         lattices = {'cartesian': {'sides':4,
@@ -12,8 +12,8 @@ class CoordinateSystem:
                                   'directions':[(1,0), # add x
                                                 (0,1), # add y
                                                 (-1,0), # subtract x
-                                                (0,-1)], # subtract y
-                                  'scaling':(1,0)},
+                                                (0,-1)]}, # subtract y
+
                     'hexagonal': {'sides':6,
                                   'coordinates':3,
                                   'adjustments':[(-1,-1,0,1,1,0),
@@ -32,21 +32,23 @@ class CoordinateSystem:
         self.matrix = matrix # (h,w) for cartesian; (h,w) or (h,w_0,w_1) for hexagonal
 
         self.even = even
-        #if even:
-        #    self.even = even
-        #elif matrix:
-        #    self.even = self._is_even(matrix)
-        #else:
-        #    self.even = even
-        #input(self.even)
+        self.orientation = orientation # hex: NS or EW; cart: even or odd
 
         self.sides = lattices[lattice]['sides']
         self.coordinates = lattices[lattice]['coordinates']
         self.adjustments = lattices[lattice]['adjustments']
         self.directions = lattices[lattice]['directions']
-        self.scaling = lattices[lattice]['scaling']
-        #if not self.even:
-        #    self.scaling = (self.scaling[0],0)
+
+        self.scaling = None
+        if self.matrix:
+            if self.lattice == 'hexagonal':
+                h_adj = lattices[lattice]['scaling'][0]
+                w_adj = lattices[lattice]['scaling'][1] if (self.matrix[1] == self.matrix[-1]) else 0
+                self.scaling = (h_adj,w_adj)
+
+    def make_matrix(self,matrix):
+        # make a matrix with the basics of this coordinate system
+        return CoordinateSystem(lattice=self.lattice,matrix=matrix,even=self.even,orientation=self.orientation)
 
     def distance(self,position1,position2=(0,0)):
         # distance between coordinates on a cartestian mapping
@@ -208,6 +210,13 @@ class CoordinateSystem:
 
         return x,y
 
+    def to_matrix(self,R,theta):
+        # convert corner on unit circle to position in matrix
+        x,y = self.from_polar(R,theta)
+        x = (x+0.5)*(self.matrix[0]-1)
+        y = (y+0.5)*(max(self.matrix[1],self.matrix[-1])-1)
+        return x,y
+
     def angle_simplified(angle):
         # returns angle in radians between -180 and 180 degrees
         in_circle = angle%(2*math.pi)
@@ -218,8 +227,8 @@ class CoordinateSystem:
         # finds the trident an angle resides and returns it as phi for sin and cos
         ratio = 4/3
         cutoff = 2*math.pi/3
-        thetha = CoordinateSystem.angle_simplified(angle)
-        if (thetha >= 0) & (theta <= cutoff):
+        theta = CoordinateSystem.angle_simplified(angle)
+        if (theta >= 0) & (theta <= cutoff):
             trident = 1
             phi = ratio*theta
         if (theta < 0) & (theta >= -cutoff):
@@ -227,7 +236,7 @@ class CoordinateSystem:
             phi = ratio*(theta+cutoff)
         else:
             trident = 2
-            phi = ratio*(thetha-cutoff)
+            phi = ratio*(theta-cutoff)
 
         return phi,trident
 
@@ -309,7 +318,7 @@ class CoordinateSystem:
     def ring_size(self,ring=0,width=0):
         # how many are containted in a ring
         if width:
-            ring = witdth//2
+            ring = width//2
         size = self._ring_start(ring+1)
         return size
 

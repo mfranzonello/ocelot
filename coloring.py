@@ -2,7 +2,6 @@
 from common import *
 from plotting import *
 import math
-import random
 import colorsys
 
 class Color:    

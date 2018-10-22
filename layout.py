@@ -84,8 +84,6 @@ class Grid:
     def _safe_cells(self):
         # returns unblocked cells that have images
         safe_cells = [cell for cell in self.cells if cell not in self.blocked]
-        ##print('BLOCKED')
-        ##print(self.blocked)
         return safe_cells
 
     def cell_filled(self,position):
@@ -99,9 +97,13 @@ class Grid:
         closed_positions = [cell for cell in self.cells if self.cell_filled(cell)]
         open_positions = sorted([(i,j) for i,j in self.positions if (i,j) not in closed_positions])
         if corner:
-            target = (corner[0]*(self.height-1),corner[1]*(self.width-1))
+            R,theta = corner
+            x,y = self.CS.from_polar(R,theta)
+            target = self.CSM.to_matrix(R,theta)
+
+            #target = (corner[0]*(self.height-1),corner[1]*(self.width-1))
             distances = [self.CS.distance(position,target) for position in open_positions]
-            #distances = [math.sqrt((i-target[0])**2 + (j-target[1])**2) for i,j in open_positions]
+
             open_positions = Common.sort_by_list(open_positions,distances)
         else:
             target = None
@@ -226,9 +228,11 @@ class Grid:
         if (self.distance_weight > 0):
             distance_weight = self.distance_weight
             if cell.picture.target is not None:
-                x1,y1 = cell.picture.target
+                R,theta = cell.picture.target
+                x1,y1 = self.CSM.to_matrix(R,theta)
+                ##x1,y1 = cell.picture.target
                 distance_strength = self.CS.distance(cell.position,cell.picture.target)/self.max_distance
-                #distance_strength = math.sqrt((x0 - x1)**2 + (y0 - y1)**2) / math.sqrt(self.height**2 + self.width**2)
+
             else:
                 distance_strength = 0.5
         else:
@@ -294,10 +298,10 @@ class Grid:
         # extend grid and add border color
         border = min(border,dimension)
 
-        hex,extra = self.CSM.scaling
-        ex = extra if self.width==self.width2 else 0
-
         if self.CS.lattice == 'hexagonal':
+            hex,extra = self.CSM.scaling
+            ex = extra if self.width==self.width2 else 0
+            
             height_adj = math.ceil(self.height/2) + math.floor(self.height/2)/2 # +1 for odd rows, +1/2 for even rows
             width_max = max(self.width,self.width2) # base overall frame on bigger of two widths
             image_height = dimension*height_adj + border*hex*self.height #borders between rows are small, overall height is adjusted because rows fit together

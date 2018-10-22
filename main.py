@@ -2,18 +2,10 @@
 from sorting import *
 #from inputs import *
 
-print('*** OCELOT V2.5 ***\n')
+print('*** OCELOT V2.7 ***\n')
 
 # assemble folders
 project = Project()
-
-                  #project_path = '{}/{}'.format(path,out_folder),
-                  #photos_path='{}/{}'.format(path,photos_folder),
-                  #profile_path='{}/{}'.format(path,profile_folder) if use_profile else False,
-                  #stories_path = '{}/{}'.format(path,stories_folder) if use_stories else False,
-                  #videos_path = '{}/{}'.format(path,videos_folder) if use_videos else False,
-                  #ig_username=ig_username if check_ig else None,
-                  #download_path=downloads_folder)
 
 # get all media
 finder = Finder(project)
@@ -24,7 +16,7 @@ collector = Collector(finder)
 collector.create_gallery(remove_duplicates=project.remove_duplicates,round_color=True,grey_pct=0.75,dark_pct=0.6,
                          grey_threshold=16,dark_threshold=100,round_threshold=16,dimension=50,aspect=project.grid_aspect,
                          randomize=True,stories=project.stories_folder,videos=project.videos_folder,
-                         center=project.profile_folder if (project.use_profile & project.profile_size) else None,lattice=project.grid_shape)
+                         center=project.profile_folder if (project.use_profile & project.profile_size) else None)##,lattice=project.grid_shape)
 
 # set up printer
 printer = Printer(collector,name=project.grid_name,dimension=project.grid_dimension,
@@ -50,7 +42,7 @@ project.add_result('iterations',sorter.n_trials)
 project.add_result('final',sorter.get_strength())
 
 # finish and print
-printer.finalize(project.grid_extension,gif=project.grid_gif)
+printer.finalize()
 
 # summarize results
 project.summarize()

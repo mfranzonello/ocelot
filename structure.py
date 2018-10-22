@@ -43,8 +43,11 @@ class Project:
         self.grid_extension = parameters.get('grid_extension')
         self.grid_dimension = parameters.get('grid_dimension')
         self.grid_shape = parameters.get('grid_shape')
-        self.grid_aspect = parameters.get('grid_aspect')
+
+        aspects = {'iphonex':(19.5,9),'iphone':(16,9),'square':(1,1),'golden':(1,1.618)}
+        self.grid_aspect = aspects.get(parameters.get('grid_aspect'),parameters.get('grid_aspect'))
         self.grid_aspect_force = parameters.get('grid_aspect_force')
+        
         self.grid_border_scale = parameters.get('grid_border_scale')
         self.grid_border_color = parameters.get('grid_border_color')
         self.grid_gif = parameters.get('grid_gif')
@@ -83,6 +86,10 @@ class Project:
         self.start_time = self._timer()
         self.iterations = 0
         self.results = []
+
+        lattice = {'rectangular':'cartesian'}.get(self.grid_shape,self.grid_shape)
+        self.coordinate_system = CoordinateSystem(lattice)
+        ##self.coordinate_matrix = None
 
     def _get_value(self,string):
         # remove end comments, apostrophes and extra spaces
@@ -153,20 +160,10 @@ class Project:
             print('{} strength: {:0.2%}'.format(result[0],result[1]))
         print('Elapsed time: {} min {} sec'.format(int(end_time[1]/60),round(end_time[1]%60)))
 
-
 class Finder:
     # finds media to use and coverts to images
     def __init__(self,project:Project):
         self.project = project
-        #self.project_path = project.project_path
-        #self.photos_path = project.photos_path
-        #self.profile_path = project.profile_path
-        #self.stories_path = project.stories_path
-        #self.videos_path = project.videos_path
-        #self.tick = project.video_tick
-        #self.username = project.username
-        #self.download_path = project.download_path
-
         self.library = Library()
 
     def find(self):
@@ -245,8 +242,7 @@ class Collector:
         self.library = finder.get_library()
         self.gallery = None
         self.project = finder.project
-        #self.project_path = finder.project_path
-        self.coordinate_system = None
+        ##self.coordinate_system = None
         print('\nAnalyzing images...')
 
     def _remove_duplicates(self):
@@ -258,9 +254,9 @@ class Collector:
 
     def create_gallery(self,remove_duplicates=True,round_color=True,grey_pct=0.75,dark_pct=0.6,
                     grey_threshold=16,dark_threshold=100,round_threshold=16,dimension=50,aspect=None,
-                    randomize=True,stories='stories',videos='videos',center=None,lattice=None):
+                    randomize=True,stories='stories',videos='videos',center=None):##,lattice=None):
         
-        self.coordinate_system = CoordinateSystem(lattice)
+        ##self.coordinate_system = CoordinateSystem(lattice)
         if remove_duplicates:
             library = self._remove_duplicates()
         else:
@@ -269,7 +265,7 @@ class Collector:
         gallery = Gallery.from_library(library,round_color=round_color,grey_pct=grey_pct,dark_pct=dark_pct,
                                        grey_threshold=grey_threshold,dark_threshold=dark_threshold,round_threshold=round_threshold,
                                        dimension=dimension,aspect=aspect,randomize=randomize,stories=stories,videos=videos,
-                                       center=center,coordinate_system=self.coordinate_system)
+                                       center=center)##,coordinate_system=self.coordinate_system)
 
         self.gallery = gallery
 
@@ -280,7 +276,7 @@ class Collector:
 class Printer:
     def __init__(self,collector:Collector,name='',dimension=200,dimension_small=20,
                  border_scale=0,border_color=(0,0,0),target_aspect=None,debugging=False):
-        self.project = collector.project #_path = collector.project_path
+        self.project = collector.project
         self.library = collector.library
         self.libary = collector.library
 
@@ -289,10 +285,6 @@ class Printer:
         self.dimension_small = dimension_small
         self.border_scale = border_scale
         self.border_color = border_color
-
-        self.coordinate_system = collector.coordinate_system
-        self.coordinate_matrix = None
-        self.lattice = self.coordinate_system.lattice
 
         self.debugging = debugging
 
@@ -313,6 +305,7 @@ class Printer:
         files = os.listdir(folder)
         name_try = name
         n = 0
+
         # add subnumber if mandatory
         if number:
             name_try = '{}_{:02}'.format(name,n)
@@ -320,10 +313,6 @@ class Printer:
             n += 1
             name_try = '{}_{:02}'.format(name,n)
         return name_try
-
-    def add_matrix(self,matrix):
-        # add a matrix to the coordinate system
-        self.coordinate_matrix = CoordinateSystem(lattice=self.lattice,matrix=matrix)
       
     def store_grid(self,grid:Grid,full=False,vibrant=True,display=False):
         # store a grid result image
@@ -352,9 +341,12 @@ class Printer:
         self.images.append(grid_image)
         return
 
-    def finalize(self,extension='jpg',gif=False,durations=[500,1000]):
+    def finalize(self,durations=[500,1000]):
         # save intermediate steps as a gif
+        extension = self.project.grid_extension
         extensions = [extension]
+
+        gif = self.project.grid_gif
         if gif:
             gif_extension = 'gif'
             extensions.append(gif_extension)

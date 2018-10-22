@@ -16,8 +16,8 @@ out_folder = 'mosaics'
 grid_name = 'mosaic'
 grid_extension = 'jpg'
 grid_dimension = 200
-grid_shape = 'hexagonal' # 'rectangular'
-grid_aspect = (19.5,9) #(1,1) # set to None to find best fit ratio
+grid_shape = 'rectangular' # 'hexagonal'
+grid_aspect = None #'golden' #(19.5,9) #(1,1) # set to None to find best fit ratio
 grid_aspect_force = False
 grid_border_scale = 0.05 # set to zero for no border
 grid_border_color = 'white'
@@ -30,15 +30,12 @@ use_stories = True
 use_videos = True
 video_tick = 60
 remove_duplicates = True
-profile_size = 0 #3 # set to zero to not center on profile
+profile_size = 3 #3 # set to zero to not center on profile
 
 # how refined should the process be?
-trials = 500 #3000
-angle_weight = 0.2
-distance_weight = 0.3
+trials = 1000 #3000
 
 # should the intermediate steps be saved?
 print_after = 1000
-secondary_scale = 1/3
 
 debugging = False

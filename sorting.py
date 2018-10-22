@@ -12,7 +12,7 @@ class Engine:
         self.grid = None
         self.printer = printer
         self.print_gif = print_gif
-        self.coordinate_system = printer.coordinate_system
+        self.coordinate_system = printer.project.coordinate_system
         self.coordinate_matrix = None
 
     def store_grid(self,dimension=50,full=False,extension='jpg'):
@@ -35,6 +35,7 @@ class Assembler(Engine):
                  secondary_scale=None,distance_weight=0,angle_weight=0,print_gif=True):
         Engine.__init__(self,printer,print_gif=print_gif)      
         print('Setting up grid...')
+        self.project = collector.project
 
         gallery = collector.get_gallery()
         # if the gallery didn't turn up a center image, then don't pass center
@@ -43,8 +44,9 @@ class Assembler(Engine):
 
         # add dimensions to the printer
         matrix = (height,width) if width2 == 0 else (height,width,width2)
-        self.printer.add_matrix(matrix)
-        self.coordinate_matrix = printer.coordinate_matrix
+        self.coordinate_matrix = self.coordinate_system.make_matrix(matrix)
+        ##self.printer.add_matrix(matrix)
+        ##self.coordinate_matrix = self.project.coordinate_matrix
 
         n_total = self.coordinate_matrix.n_total()
         center_total = self.coordinate_matrix.ring_size(width=center_size)
@@ -71,8 +73,8 @@ class Assembler(Engine):
 
         # if a center size is given, find if even or odd sizing is better
         if center_size > 0:
-            center_size_even = round((center_size)/2,0)*2
-            center_size_odd = round((center_size-1)/2,0)*2+1
+            center_size_even = round((center_size)/2)*2
+            center_size_odd = round((center_size-1)/2)*2+1
             n_pics_even = n_pics + center_size_even**2
             n_pics_odd = n_pics + center_size_odd**2
             height_even,width_even,_,_ = self._best_fit(n_pics_even,aspect=aspect,odd=False)
@@ -81,9 +83,9 @@ class Assembler(Engine):
             deviations_even = n_pics_even - height_even*width_even
             deviations_odd = n_pics_odd - height_odd*width_odd
             if deviations_even < deviations_odd:
-                height,width,_,center_size = height_even,width_even,center_size_even
+                height,width,center_size = height_even,width_even,center_size_even
             else:
-                height,width,_,center_size = height_odd,width_odd,center_size_odd
+                height,width,center_size = height_odd,width_odd,center_size_odd
 
         # no center size given or center size added to n_pics for recursion
         else:
@@ -141,6 +143,8 @@ class Sorter(Engine):
     # engine that can improve color matching in a grid
     def __init__(self,assembler:Assembler,print_after=1000):
         Engine.__init__(self,assembler.printer,assembler.print_gif)
+        self.project = assembler.project
+
         self.grid = assembler.get_grid()
 
         self.n_trials = 0

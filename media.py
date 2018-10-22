@@ -3,6 +3,7 @@ from common import *
 from coloring import *
 from plotting import *
 #from operator import itemgetter
+import random
 from PIL import Image,ImageChops,ImageDraw
 import cv2
 import numpy
@@ -364,7 +365,7 @@ class Picture:
 
 class Gallery:
     # collection of colors with order
-    def __init__(self,pictures,randomize=True,stories='stories',videos='videos',center=None,coordinate_system=CoordinateSystem()):
+    def __init__(self,pictures,randomize=True,stories='stories',videos='videos',center=None): ##,coordinate_system=CoordinateSystem()):
         self.center = None
         if center:
             if center in pictures:
@@ -375,7 +376,7 @@ class Gallery:
                     self.center = center_pics[0]
             pictures = [p for p in pictures if p != self.center]
 
-        self.CS = coordinate_system
+        ##self.CS = coordinate_system
 
         if randomize:
             pictures1 = [p for p in pictures if not any((self._folder_in_id(stories,p.id),self._folder_in_id(videos,p.id)))]
@@ -402,7 +403,7 @@ class Gallery:
 
     def from_library(library,round_color=False,grey_pct=100,dark_pct=100,
                      grey_threshold=16,dark_threshold=100,round_threshold=16,
-                     dimension=0,aspect=(1,1),randomize=True,stories='stories',videos='videos',center=None,coordinate_system=CoordinateSystem()):
+                     dimension=0,aspect=(1,1),randomize=True,stories='stories',videos='videos',center=None): ##,coordinate_system=CoordinateSystem()):
         # construct a gallery from a library
         pixelation = [Pixelation(library.get_photo(photo),round_color=round_color,
                                  grey_pct=grey_pct,dark_pct=dark_pct,
@@ -412,7 +413,7 @@ class Gallery:
         pictures = [Picture(px.id,px.prominent_color(),
                             secondary=px.secondary_color(),
                             greyscale=px.prominent_color(vibrant=False)) for px in pixelation]
-        gallery = Gallery(pictures,randomize=randomize,stories=stories,videos=videos,center=center,coordinate_system=coordinate_system)
+        gallery = Gallery(pictures,randomize=randomize,stories=stories,videos=videos,center=center) ##,coordinate_system=coordinate_system)
     
         print('\n')
     
@@ -440,13 +441,12 @@ class Gallery:
         if dark:
             S = 1
 
-        x,y = self.CS.from_polar(R*s*(2-V)**2,H)
-        x = max(0,x+0.5)
-        y = max(0,y+0.5)
-        #x = max(0,min(1, R * math.cos(H) * S * (2-V)**2 + 0.5))
-        #y = max(0,min(1, R * math.sin(H) * S * (2-V)**2 + 0.5))
+        ##x,y = self.CS.from_polar(R*s*(2-V)**2,H)
+        ##x = max(0,x+0.5)
+        ##y = max(0,y+0.5)
         
-        return (x,y),dark,H
+        return R,H,dark
+        ##return (x,y),dark,H
 
     def cycle_list(self,values,n):
         # return every nth element to distribute evenly
@@ -469,7 +469,10 @@ class Gallery:
 
         for picture in self.pictures:
             # get corner and darkness
-            self.corners[picture.id],dark,H = self.get_hsv_corner(picture.color,angle=self.angle,hues=hues)
+            R,H,dark = self.get_hsv_corner(picture.color,angle=self.angle,hues=hues)
+            self.corners[picture.id] = (R,H)
+
+            ##self.corners[picture.id],dark,H = self.get_hsv_corner(picture.color,angle=self.angle,hues=hues)
             self.pictures[self.pictures.index(picture)].angle = H
             # order pictures based on darkness
             if dark:
