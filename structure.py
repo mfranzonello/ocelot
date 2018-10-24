@@ -97,7 +97,6 @@ class Project:
 
         lattice = {'rectangular':'cartesian'}.get(self.grid_shape,self.grid_shape)
         self.coordinate_system = CoordinateSystem(lattice)
-        ##self.coordinate_matrix = None
 
     def _get_value(self,string):
         # remove end comments, apostrophes and extra spaces
@@ -200,7 +199,9 @@ class Finder:
     def _get_photos(self,folder,in_extensions=['jpg','png','bmp','gif'],crop=False):
         # find posted photos, profile or stories
         files = Common.find_files(folder,extensions=in_extensions)
+
         photos = [Photo(fn) for fn in files]
+
         if crop:
             photos = [j for k in [p.crop_photo() for p in photos] for j in k]
         library = Library(photos)
@@ -212,7 +213,9 @@ class Finder:
         library = Library()
         for fn in files:
             video = Video(fn)
-            library.add_photos(video.get_photos(tick=self.project.video_tick,first_only=first_only))
+            photos = video.get_photos(tick=self.project.video_tick,first_only=first_only)
+            library.add_photos(photos)
+
         self.library.merge_library(library)
         
     def _get_pictures(self):
@@ -250,7 +253,7 @@ class Collector:
         self.library = finder.get_library()
         self.gallery = None
         self.project = finder.project
-        ##self.coordinate_system = None
+
         print('\nAnalyzing images...')
 
     def _remove_duplicates(self):
@@ -262,9 +265,8 @@ class Collector:
 
     def create_gallery(self,remove_duplicates=True,round_color=True,grey_pct=0.75,dark_pct=0.6,
                     grey_threshold=16,dark_threshold=100,round_threshold=16,dimension=50,aspect=None,
-                    randomize=True,stories='stories',videos='videos',center=None):##,lattice=None):
-        
-        ##self.coordinate_system = CoordinateSystem(lattice)
+                    randomize=True,stories='stories',videos='videos',center=None):
+
         if remove_duplicates:
             library = self._remove_duplicates()
         else:
@@ -273,7 +275,7 @@ class Collector:
         gallery = Gallery.from_library(library,round_color=round_color,grey_pct=grey_pct,dark_pct=dark_pct,
                                        grey_threshold=grey_threshold,dark_threshold=dark_threshold,round_threshold=round_threshold,
                                        dimension=dimension,aspect=aspect,randomize=randomize,stories=stories,videos=videos,
-                                       center=center)##,coordinate_system=self.coordinate_system)
+                                       center=center)
 
         self.gallery = gallery
 

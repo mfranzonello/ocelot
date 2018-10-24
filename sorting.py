@@ -82,9 +82,13 @@ class Assembler(Engine):
 
             deviations_even = n_pics_even - height_even*width_even
             deviations_odd = n_pics_odd - height_odd*width_odd
-            if deviations_even < deviations_odd:
-                height,width,center_size = height_even,width_even,center_size_even
-            else:
+            
+            if self.coordinate_system.lattice == 'cartesian':
+                if deviations_even < deviations_odd:
+                    height,width,center_size = height_even,width_even,center_size_even
+                else:
+                    height,width,center_size = height_odd,width_odd,center_size_odd
+            elif self.coordinate_system.lattice == 'hexagonal':
                 height,width,center_size = height_odd,width_odd,center_size_odd
 
         # no center size given or center size added to n_pics for recursion

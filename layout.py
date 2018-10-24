@@ -19,12 +19,10 @@ class Cell:
 
     def add_neighbors(self,height,width,CSM:CoordinateSystem):
         # add positions of cells that border this cells
-        #x,y = self.position
         self.neighbors = CSM.neighbors(self.position)
 
 class Grid:
     # collection of cells with bridges and tautness
-    # bridge: the connection between neighbor cells
     # tautness: the sum of strengths across all bridges
     def __init__(self,height:int,width:int=0,width2:int=0,angle=False,
                  distance_weight=0,angle_weight=0,dark_weight=0,
@@ -92,10 +90,7 @@ class Grid:
             R,theta = corner
             x,y = self.CS.from_polar(R,theta)
             target = self.CSM.polar_to_matrix(R,theta)
-
-            #target = (corner[0]*(self.height-1),corner[1]*(self.width-1))
             distances = [self.CS.distance(position,target) for position in open_positions]
-
             open_positions = Common.sort_by_list(open_positions,distances)
         else:
             target = None
@@ -120,7 +115,6 @@ class Grid:
 
     def add_center(self,center_size=1,x_loc=0.5,y_loc=0.5):
         # block off space in the center of the grid for a larger central image
-        ## FUTURE: allow center to be at a row other than height/2
         if center_size > 0:
             # find center of matrix
 
@@ -136,7 +130,7 @@ class Grid:
             for c in range(center_size//2):
                 neighbors = []
                 for b in blocked_ring:
-                    neighbors.extend(self.CSM.neighbors(b,half_width=True))
+                    neighbors.extend(self.CSM.neighbors(b,half_width=self.CS.lattice=='hexagonal'))
                 blocked_ring.extend(neighbor for neighbor in neighbors if neighbor not in blocked_ring)
               
             self.blocked.extend(blocked_ring)
@@ -233,7 +227,7 @@ class Grid:
             if cell.picture.target is not None:
                 R,theta = cell.picture.target
                 x1,y1 = self.CSM.polar_to_matrix(R,theta)
-                ##x1,y1 = cell.picture.target
+
                 distance_strength = self.CS.distance(cell.position,cell.picture.target)/self.max_distance
 
             else:
@@ -305,7 +299,7 @@ class Grid:
         safe_cells = self._safe_cells()
         taut_exp = sum([self.cells[cell].strength for cell in safe_cells])/len(safe_cells)
         taut = 1 - 2*taut_exp
-        #taut = (exp**taut_exp-1)*(exp-1)
+
         return taut
 
     def save_output(self,dimension=50,library=None,
@@ -362,7 +356,7 @@ class Grid:
                         color = picture.greyscale
 
                     dimension_paste = int(dimension*dim_mul)
-                    paste_picture = Image.new('RGB',(dimension_paste,dimension_paste),color.rgb) # need height vs width??
+                    paste_picture = Image.new('RGB',(dimension_paste,dimension_paste),color.rgb)
                     
                     if (secondary_scale is not None) & (picture.secondary is not None):
                         secondary = picture.secondary
@@ -400,7 +394,7 @@ class Grid:
                     i_p,j_p = i,j
                     
                 elif self.CS.lattice == 'hexagonal':
-                    paste_picture = Shaper.shape(paste_picture,'hexagon',size=self.center_size-1 if center else 1)
+                    paste_picture = Shaper.shape(paste_picture,'hexagon',size=self.center_size//2+1 if center else 1)
                     paste_mask = paste_picture
                     d_p = (1-hex)*dimension
                     j_p,i_p = self.CS.to_rectangular((j,i))
@@ -409,7 +403,7 @@ class Grid:
                     if self.CS.lattice == 'cartesian':
                         c_ex = 0
                     elif self.CS.lattice == 'hexagonal':
-                        c_ex = 1/4
+                        c_ex = 1/4 * (self.center_size//2)
                     move_i = self.CSM.convert_height(dimension*(self.center_size-1)/2) + border*(self.center_size-1)/2 + c_ex*dimension
                     move_j = self.CSM.convert_width(dimension*(self.center_size-1)/2) + border*(self.center_size-1)/2
                     

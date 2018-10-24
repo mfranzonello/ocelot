@@ -2,7 +2,6 @@
 from common import *
 from coloring import *
 from plotting import *
-#from operator import itemgetter
 import random
 from PIL import Image,ImageChops,ImageDraw
 import cv2
@@ -13,9 +12,9 @@ class Photo:
     def __init__(self,fn,image=None):
         self.id = fn
         if image is None:
-            if any('.{}'.format(ext) in fn for ext in ['jpg','jpeg','gif','tif','bmp','png']):
+            if Common.extension_in(fn,['jpg','jpeg','gif','tif','bmp','png']):
                 image = Image.open(fn)
-            elif any('.{}'.format(ext) in fn for ext in ['avi','mp4','mov']):
+            elif Common.extension_in(fn,['avi','mp4','mov']):
                 video = Video(fn)
                 image = video.get_photos(first_only=True)
             else:
@@ -377,8 +376,6 @@ class Gallery:
                     self.center = center_pics[0]
             pictures = [p for p in pictures if p != self.center]
 
-        ##self.CS = coordinate_system
-
         if randomize:
             pictures1 = [p for p in pictures if not any((self._folder_in_id(stories,p.id),self._folder_in_id(videos,p.id)))]
             pictures2 = [p for p in pictures if all((self._folder_in_id(stories,p.id),not self._folder_in_id(videos,p.id)))]
@@ -514,7 +511,7 @@ class Shaper:
                 position = positions[-1][0] + pieces[p][0], positions[-1][1] + pieces[p][1]
                 positions.append(position)
 
-            positions = [(positions[1][0],0)] + positions[2:] # delete adjust starting
+            positions = [(positions[1][0],0)] + positions[2:] # delete starting adjustments
 
             positionsNE = [(p[0]/resize,p[1]/resize) for p in positions]
 
@@ -560,7 +557,7 @@ class Shaper:
     def blot(image:Image):
         # turn transparency to white:
         imArray = numpy.copy(numpy.asarray(image.convert('RGBA')))
-        r,g,b,a = numpy.moveaxis(imArray,-1,0) #rollaxis(imArray,axis=-1)
+        r,g,b,a = numpy.moveaxis(imArray,-1,0)
         r[a==0],g[a==0],b[a==0] = (255,255,255)
         newImArray = numpy.dstack([r,g,b,a])
         blotted = Image.fromarray(newImArray,'RGBA').convert('RGB')
