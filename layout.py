@@ -22,22 +22,12 @@ class Cell:
         #x,y = self.position
         self.neighbors = CSM.neighbors(self.position)
 
-        #directions = {'up':(0,-1),
-        #              'down':(0,1),
-        #              'left':(-1,0),
-        #              'right':(1,0)}
-        #for d in directions:
-        #    x1 = x+directions[d][0]
-        #    y1 = y+directions[d][1]
-        #    if ((x1 >= 0) & (x1 < height) & (y1 >= 0) & (y1 < width)):
-        #        self.neighbors += [(x1,y1)]
-
-
 class Grid:
     # collection of cells with bridges and tautness
     # bridge: the connection between neighbor cells
     # tautness: the sum of strengths across all bridges
-    def __init__(self,height:int,width:int=0,width2:int=0,angle=False,distance_weight=0,angle_weight=0,
+    def __init__(self,height:int,width:int=0,width2:int=0,angle=False,
+                 distance_weight=0,angle_weight=0,dark_weight=0,
                  coordinate_system=CoordinateSystem()):
         if width == 0:
             width = height
@@ -49,11 +39,13 @@ class Grid:
         self.cells = {}
         self.blocked = []
         self.center = None
+        self.center_size = 0
 
         self.angle = angle
 
         self.distance_weight = distance_weight
         self.angle_weight = angle_weight
+        self.dark_weight = dark_weight
 
         self.CS = coordinate_system
         self.CSM = CoordinateSystem(self.CS.lattice,self.dimensions)
@@ -99,7 +91,7 @@ class Grid:
         if corner:
             R,theta = corner
             x,y = self.CS.from_polar(R,theta)
-            target = self.CSM.to_matrix(R,theta)
+            target = self.CSM.polar_to_matrix(R,theta)
 
             #target = (corner[0]*(self.height-1),corner[1]*(self.width-1))
             distances = [self.CS.distance(position,target) for position in open_positions]
@@ -126,25 +118,34 @@ class Grid:
             self.cells[(x,y)].add_neighbors(self.height,self.width,self.CSM)
             self.cells[(x,y)].picture.target = target
 
-    def add_center(self,center_size=1,blocked=None):
+    def add_center(self,center_size=1,x_loc=0.5,y_loc=0.5):
         # block off space in the center of the grid for a larger central image
-        # height and width should both be odd or even together
-        # need to round center_size to be odd or even too
-        # ensure a buffer between the center and the sides of the grid
-        ## FUTURE: use CoordinateSystem to specifiy coordinate cells and use self.center
+        ## FUTURE: allow center to be at a row other than height/2
         if center_size > 0:
-            if blocked is not None:
-                self.blocked.extend(blocked)
-            else:
-                blocked_cells = self.CSM.get_positions(position=(self.height//2,self.width//2),
-                                                       width=center_size)
-                self.blocked.extend(blocked_cells)
+            # find center of matrix
 
+            center_size = min((center_size,self.height//2,self.width//2))
+            xy = self.CSM.in_matrix((0,0),x_loc=x_loc,y_loc=y_loc,force=self.CSM.lattice=='hexagonal')
+
+            self.center = xy
+            self.center_size = center_size
+
+            # block neighboring cells
+            blocked_ring = [xy]
+
+            for c in range(center_size//2):
+                neighbors = []
+                for b in blocked_ring:
+                    neighbors.extend(self.CSM.neighbors(b,half_width=True))
+                blocked_ring.extend(neighbor for neighbor in neighbors if neighbor not in blocked_ring)
+              
+            self.blocked.extend(blocked_ring)
+            
     def add_from_gallery(self,gallery:Gallery):
         # add pictures from a gallery in a specific order
         self.angle = gallery.angle
         if gallery.center:
-            center_xy = min(self.blocked) ## HEX??
+            center_xy = self.center
             self.cells[center_xy] = Cell(gallery.center,center_xy)
 
         for picture in gallery.pictures:
@@ -157,7 +158,7 @@ class Grid:
     def send_to_gallery(self):
         # put all pictures back into a gallery
         if len(self.blocked):
-            center_xy = min(self.blocked)
+            center_xy = self.center
             center = self.cells[center_xy].picture
         else:
             center = None
@@ -174,9 +175,11 @@ class Grid:
         gallery = self.send_to_gallery()
         
         gallery.order_pictures()
-        grid = Grid(self.height,self.width,self.width2,distance_weight=self.distance_weight,angle_weight=self.angle_weight,
+        grid = Grid(self.height,self.width,self.width2,distance_weight=self.distance_weight,angle_weight=self.angle_weight,dark_weight=self.dark_weight,
                     coordinate_system=self.CS)
-        grid.add_center(blocked=self.blocked)
+        grid.blocked = self.blocked 
+        grid.center = self.center
+        grid.center_size = self.center_size
         grid.add_from_gallery(gallery)
         return grid
 
@@ -229,7 +232,7 @@ class Grid:
             distance_weight = self.distance_weight
             if cell.picture.target is not None:
                 R,theta = cell.picture.target
-                x1,y1 = self.CSM.to_matrix(R,theta)
+                x1,y1 = self.CSM.polar_to_matrix(R,theta)
                 ##x1,y1 = cell.picture.target
                 distance_strength = self.CS.distance(cell.position,cell.picture.target)/self.max_distance
 
@@ -253,13 +256,29 @@ class Grid:
             angle_weight = 0
             angle_strength = 0
 
+        # account for darkness
+        if self.dark_weight > 0:
+            dark_weight = self.dark_weight
+            if cell.picture.dark:
+                distance_to_edge = self.CSM.path_finder(cell.position,to_edge=True,normalize=True)
+            else:
+                distance_to_edge = 0
+            dark_strength = dark_weight * distance_to_edge
+        else:
+            dark_weight = 0
+            dark_strength = 0
+
         # account for color difference
-        difference_weight = 1 - sum([distance_weight,angle_weight])
+        difference_weight = 1 - sum([distance_weight,angle_weight,dark_weight])
         neighbors = [neighbor for neighbor in cell.neighbors if neighbor not in self.blocked]
-        differences = [(cell.picture.difference(self.cells[neighbor].picture))**2 for neighbor in neighbors]
-        difference_strength = difference_weight * (sum(differences) / len(neighbors))
+
+        if len(neighbors):
+            differences = [(cell.picture.difference(self.cells[neighbor].picture))**2 for neighbor in neighbors]
+            difference_strength = difference_weight * (sum(differences) / len(neighbors))
+        else:
+            difference_strength = 0
         
-        self.cells[(x0,y0)].strength = difference_strength + distance_strength + angle_strength
+        self.cells[(x0,y0)].strength = difference_strength + distance_strength + angle_strength + dark_strength
 
     def add_cell_strengths(self,region=None):
         # update all cell strengths
@@ -298,36 +317,42 @@ class Grid:
         # extend grid and add border color
         border = min(border,dimension)
 
-        if self.CS.lattice == 'hexagonal':
-            hex,extra = self.CSM.scaling
-            ex = extra if self.width==self.width2 else 0
-            
-            height_adj = math.ceil(self.height/2) + math.floor(self.height/2)/2 # +1 for odd rows, +1/2 for even rows
-            width_max = max(self.width,self.width2) # base overall frame on bigger of two widths
-            image_height = dimension*height_adj + border*hex*self.height #borders between rows are small, overall height is adjusted because rows fit together
-            image_width = dimension*(width_max*hex+ex) + border*hex*width_max
-
-        elif self.CS.lattice == 'cartesian':
+        if self.CS.lattice == 'cartesian':
             image_width = (dimension + border)*self.width
             image_height = (dimension + border)*self.height
-    
 
+        elif self.CS.lattice == 'hexagonal':
+            hex,extra = self.CSM.scaling
+            ex = extra if self.width==self.width2 else 0
+            height_even = (1-self.height%2)
+
+            width_max = max([self.width,self.width2])
+            height_adj,width_adj = self.CSM.convert_dimensions(self.height,self.width,self.width2)
+
+            image_height = dimension*height_adj + border*hex*self.height # borders between rows are small, overall height is adjusted because rows fit together
+            image_width = dimension*(width_adj) + border*(width_max-height_even/2) # second row starts shifted by 1/4 border #width_max for width_adj
+        
         # prevent program from crashing by capping image size
         image_width = round(min(capsize,image_width))
         image_height = round(min(capsize,image_height))
 
         grid_image = Image.new('RGB',(image_width,image_height),border_color)
 
-        center_block = min(self.blocked) if len(self.blocked) else None ## FUTURE: use CoordinateSystem
-        
-        for i,j in self.positions:
+        if (self.center is not None) & (self.center not in self.positions):
+            positions = [self.center] + self.positions
+        else:
+            positions = self.positions
+
+        for i,j in positions:
             if self.cells[(i,j)]:
                 picture = self.cells[(i,j)].picture
-                # expand the center image
-                dim_mul = 1
 
-                if (i,j) == center_block:
-                    dim_mul = (max(self.blocked)[0] - min(self.blocked)[0] + 1)
+                # expand the center image
+                center = (i,j) == self.center
+                if center:
+                    dim_mul = self.center_size
+                else:
+                    dim_mul = 1
                         
                 paste_secondary = None
                 if library is None:
@@ -336,7 +361,8 @@ class Grid:
                     else:
                         color = picture.greyscale
 
-                    paste_picture = Image.new('RGB',(dimension*dim_mul,dimension*dim_mul),color.rgb)
+                    dimension_paste = int(dimension*dim_mul)
+                    paste_picture = Image.new('RGB',(dimension_paste,dimension_paste),color.rgb) # need height vs width??
                     
                     if (secondary_scale is not None) & (picture.secondary is not None):
                         secondary = picture.secondary
@@ -365,26 +391,37 @@ class Grid:
                     if h != w:
                         m = min(h,w)/2
                         paste_picture = paste_picture.crop((int(h/2-m),int(w/2-m),int(h/2+m),int(w/2+m)))
-                    dim_resize = dimension*dim_mul + border*(dim_mul-1)
+                    dim_resize = int(dimension*dim_mul + border*(dim_mul-1))
                     paste_picture = paste_picture.resize((dim_resize,dim_resize),Image.ANTIALIAS)
 
-                if self.CS.lattice == 'hexagonal':
-                    paste_picture = Shaper.shape(paste_picture,'hexagon')
-                    paste_mask = paste_picture
-                    d_p = (1-hex)*dimension
-                    j_p,i_p = self.CS.to_rectangular((j,i))
-                else:
+                if self.CS.lattice == 'cartesian':
                     paste_mask = None
                     d_p = 0
                     i_p,j_p = i,j
+                    
+                elif self.CS.lattice == 'hexagonal':
+                    paste_picture = Shaper.shape(paste_picture,'hexagon',size=self.center_size-1 if center else 1)
+                    paste_mask = paste_picture
+                    d_p = (1-hex)*dimension
+                    j_p,i_p = self.CS.to_rectangular((j,i))
+                
+                if center:
+                    if self.CS.lattice == 'cartesian':
+                        c_ex = 0
+                    elif self.CS.lattice == 'hexagonal':
+                        c_ex = 1/4
+                    move_i = self.CSM.convert_height(dimension*(self.center_size-1)/2) + border*(self.center_size-1)/2 + c_ex*dimension
+                    move_j = self.CSM.convert_width(dimension*(self.center_size-1)/2) + border*(self.center_size-1)/2
+                    
+                else:
+                    move_i,move_j = 0,0
 
-                paste_box = (int(dimension*j_p + border*(j_p+0.5)-j_p*d_p),
-                             int(dimension*i_p + border*(i_p+0.5)-i_p*d_p),
-                             int(dimension*(j_p+dim_mul) + border*(j_p+dim_mul-0.5)-j_p*d_p),
-                             int(dimension*(i_p+dim_mul) + border*(i_p+dim_mul-0.5)-i_p*d_p))
+                paste_TL = (int(dimension*j_p + border*(j_p+0.5) - j_p*d_p - move_j),
+                            int(dimension*i_p + border*(i_p+0.5) - i_p*d_p - move_i))
+                paste_box = (paste_TL[0],paste_TL[1],
+                             paste_TL[0]+paste_picture.height,paste_TL[1]+paste_picture.width)
 
                 grid_image.paste(paste_picture,paste_box,paste_mask)
-                #grid_image.save('C:\\Users\\mfran\\OneDrive\\Projects/mf_traveler_20181013/mosaics/test.png')
 
         if self.CS.lattice == 'hexagonal':
             grid_image = Shaper.blot(grid_image)

@@ -9,21 +9,25 @@ class CoordinateSystem:
                                   'coordinates':2,
                                   'adjustments':[(0,-1,0,1),
                                                  (1,0,-1,0)], # N, W, S, E
-                                  'directions':[(1,0), # add x
-                                                (0,1), # add y
-                                                (-1,0), # subtract x
-                                                (0,-1)]}, # subtract y
+                                  'directions':[(1,0), # +x
+                                                (0,1), # +y
+                                                (-1,0), # -x
+                                                (0,-1), # -y
+                                                (1,1), # +x,+y
+                                                (-1,1), # -x,+y
+                                                (-1,-1), # -x,-y
+                                                (1,-1)]}, # +x,-y
 
                     'hexagonal': {'sides':6,
                                   'coordinates':3,
                                   'adjustments':[(-1,-1,0,1,1,0),
                                                  (1,0,-1,-1,0,1)], # NW, W, SW, SE, E, NE
-                                  'directions':[(1,0), # add x
-                                                (0,1), # add y
-                                                (1,-1), # add z
-                                                (-1,0), # subtract x
-                                                (0,-1), # subtract y
-                                                (-1,1)], # subtract z
+                                  'directions':[(1,0), # +x
+                                                (0,1), # +y
+                                                (1,-1), # +z
+                                                (-1,0), # -x
+                                                (0,-1), # -y
+                                                (-1,1)], # -z
                                   'scaling':(math.sqrt(3)/2,0.5)}}
 
         if lattice not in lattices:
@@ -40,11 +44,11 @@ class CoordinateSystem:
         self.directions = lattices[lattice]['directions']
 
         self.scaling = None
-        if self.matrix:
-            if self.lattice == 'hexagonal':
-                h_adj = lattices[lattice]['scaling'][0]
-                w_adj = lattices[lattice]['scaling'][1] if (self.matrix[1] == self.matrix[-1]) else 0
-                self.scaling = (h_adj,w_adj)
+        if self.lattice == 'hexagonal':
+            hex,extra = lattices[lattice]['scaling']
+            if self.matrix and (self.matrix[1] != self.matrix[-1]):
+                ex = 0
+            self.scaling = (hex,extra)
 
     def make_matrix(self,matrix):
         # make a matrix with the basics of this coordinate system
@@ -210,11 +214,26 @@ class CoordinateSystem:
 
         return x,y
 
-    def to_matrix(self,R,theta):
+    def polar_to_matrix(self,R,theta):
         # convert corner on unit circle to position in matrix
-        x,y = self.from_polar(R,theta)
-        x = (x+0.5)*(self.matrix[0]-1)
-        y = (y+0.5)*(max(self.matrix[1],self.matrix[-1])-1)
+        if self.matrix:
+            x,y = self.in_matrix(self.from_polar(R,theta))
+            return x,y
+
+    def in_matrix(self,position,force=False,x_loc=0.5,y_loc=0.5):
+        # transpose a position from a 0,0 center to a matrix
+        x,y = position
+        x = x+x_loc*(self.matrix[0]-1)
+        y = y+y_loc*(self.matrix[1]-1) - (self.lattice=='hexagonal')*(x/2)
+
+        if force:
+            if self.lattice == 'cartesian':
+                x = max(0,min(int(x),self.matrix[0]))
+                y = max(0,min(int(y),self.matrix[1]))
+            elif self.lattice == 'hexagonal':
+                x = max(0,min(int(x),self.matrix[0]))
+                y = max(-x//2,min(int(y),[self.matrix[1],self.matrix[-1]][x%2]-x//2))
+
         return x,y
 
     def angle_simplified(angle):
@@ -225,7 +244,7 @@ class CoordinateSystem:
 
     def angle_hex(angle):
         # finds the trident an angle resides and returns it as phi for sin and cos
-        ratio = 4/3
+        ratio = 3/4
         cutoff = 2*math.pi/3
         theta = CoordinateSystem.angle_simplified(angle)
         if (theta >= 0) & (theta <= cutoff):
@@ -251,9 +270,27 @@ class CoordinateSystem:
         diff = min(diff,2*math.pi - diff)
         return diff
 
-    def neighbors(self,position):
+    def _is_half(self,position_x):
+        # check if position is at half point
+        half = round(position_x%1,1)==0.5
+        return half
+
+    def neighbors(self,position,half_height=False,half_width=False):
         # list of neighboring cells
-        neighbor_cells = [(position[0]+direction[0],position[1]+direction[1]) for direction in self.directions]
+        if half_height & half_width:
+            half = self._is_half(position[0]) & self._is_half(position[1])
+        elif half_height:
+            half = self._is_half(position[0])
+        elif half_width:
+            half = self._is_half(position[1])
+        else:
+            half = False
+
+        if (self.lattice == 'cartesian') & half:
+            directions = [(x/2,y/2) for x,y in self.directions[len(self.directions)//2:]] # half cell positions are diagonals only
+        else:
+            directions = self.directions
+        neighbor_cells = [(round(position[0]+direction[0]),round(position[1]+direction[1])) for direction in directions]
 
         if self.matrix:
             if self.lattice == 'cartesian':
@@ -281,7 +318,7 @@ class CoordinateSystem:
         even = (w%2 == 0)
         return even
 
-    def get_positions(self,position=None,rings=None,width=None):
+    def get_positions(self,rings=None,width=None):
         # return all positions in matrix or positions in a ring
         positions = None
         
@@ -292,15 +329,19 @@ class CoordinateSystem:
             if self.matrix:
                 # check if even and create regular coordinate system
                 CS = CoordinateSystem(lattice=self.lattice,even=self._is_even(self.matrix))
-                cs_positions = CS.get_positions(position=position,rings=rings,width=width)
-                positions = [(int(p[0]+position[0]),int(p[1]+position[1])) for p in cs_positions \
-                    if (int(p[0]+position[0]),int(p[1]+position[1])) in self.get_positions()]
+                cs_positions = CS.get_positions(rings=rings,width=width)
+                positions = [self.in_matrix(position,force=True) for position in cs_positions]
+                
             else:
                 range_n = range(self.even,self._ring_start(rings+1)+1)
                 positions = [self.n_to_position(n) for n in range_n]
 
         elif self.matrix:
-            positions = [self.n_to_position(n) for n in range(self.matrix[0]*self.matrix[1])]
+            if self.lattice == 'cartesian':
+                positions = [(x,y) for x in range(self.matrix[0]) for y in range(self.matrix[1])]
+            elif self.lattice == 'hexagonal':
+                positions = [(2*x,y-x) for x in range(math.ceil(self.matrix[0]/2)) for y in range(self.matrix[1])] \
+                          + [(2*x+1,y-x) for x in range(math.floor(self.matrix[0]/2)) for y in range(self.matrix[-1])]               
         
         return positions
 
@@ -322,15 +363,76 @@ class CoordinateSystem:
         size = self._ring_start(ring+1)
         return size
 
-    def path_finder(self,position1,position2):
+    def path_finder(self,position1,position2=None,to_edge=False,normalize=False):
         # return shortest path between cells
-        if self.lattice == 'cartesian':
-            routes = [abs(position1[0]-position2[0]),
-                      abs(position1[1]-position2[1])]
-        elif self.lattice == 'hexagonal':
-            routes = sorted([abs(position1[0]-position2[0]),
-                             abs(position1[1]-position2[1]),
-                             abs(-(position1[0]+position1[1])+(position2[0]+position2[1]))])
-        path = routes[0] + routes[1]
+        if position2:
+            if self.lattice == 'cartesian':
+                routes = [abs(position1[0]-position2[0]),
+                          abs(position1[1]-position2[1])]
+            elif self.lattice == 'hexagonal':
+                routes = sorted([abs(position1[0]-position2[0]),
+                                 abs(position1[1]-position2[1]),
+                                 abs(-(position1[0]+position1[1])+(position2[0]+position2[1]))])
+            path = routes[0] + routes[1]
+        elif to_edge:
+            if self.lattice == 'cartesian':
+                edge_N = self.matrix[0],position1[0]
+                edge_S = 0,position1[0]
+                edge_W = position1[0],0
+                edge_E = position1[0],self.matrix[1]
+            elif self.lattice == 'hexagonal':
+                offset = position1[0]//2
+                edge_N = self.matrix[0],position1[1] + offset - self.matrix[0]//2
+                edge_S = 0,position1[1] + offset
+                edge_W = position1[0],0 - offset
+                edge_E = position1[0],[self.matrix[1],self.matrix[-1]][position1[0]%2] - offset
+            if normalize:
+                normal_NS = self.matrix[0]/2
+                normal_WE = (self.matrix[1]+self.matrix[-1])/4
+                normal = [normal_NS,normal_NS,normal_WE,normal_WE]
+            else:
+                normal = [1,1,1,1]
+            edges = zip([edge_N,edge_S,edge_W,edge_E],normal)
+            path = min(self.path_finder(position1,edge[0])/edge[1] for edge in edges)
         return path
 
+    def flip(self,position):
+        # flip a position from HW to WH
+        return
+
+    def convert_height(self,height,inverse=False):
+        # convert lattice matrix height
+        if self.lattice == 'hexagonal':
+            if inverse:
+                height = math.floor(height*4/3)
+            else:
+                height_even = 1-height%2
+                height = math.ceil(height/2) + math.floor(height/2)/2 + 1/4*height_even
+        return height
+
+    def convert_width(self,width,inverse=False,even=False):
+        # convert lattice matrix width
+        if self.lattice == 'hexagonal':
+            hex,extra = self.scaling
+            ex = extra if even else 0
+            if inverse:
+                width = (width-ex)/hex
+            else:
+                width = width*hex+ex
+        return width
+
+    def convert_aspect(self,aspect):
+        # give an aspect ratio relative to matrix
+        if self.lattice == 'hexagonal':
+            aspect = self.convert_height(aspect[0],inverse=True), self.convert_width(aspect[1],inverse=True) # even??
+        return aspect
+
+    def convert_dimensions(self,height:int,width:int,width2:int=None):
+        # converts lattice matrix dimensions
+        if self.lattice == 'hexagonal':
+            even =(height>1) & ((width==width2) | (width2 is None))
+            if width2:
+                width = max([width,width2])
+            height = self.convert_height(height)
+            width = self.convert_width(width,even=even)
+        return height,width

@@ -32,7 +32,7 @@ class Engine:
 class Assembler(Engine):
     # engine that can assemble a grid from collector specifications
     def __init__(self,collector:Collector,printer:Printer,name='',aspect=None,center_size=0,
-                 secondary_scale=None,distance_weight=0,angle_weight=0,print_gif=True):
+                 secondary_scale=None,print_gif=True):
         Engine.__init__(self,printer,print_gif=print_gif)      
         print('Setting up grid...')
         self.project = collector.project
@@ -40,20 +40,20 @@ class Assembler(Engine):
         gallery = collector.get_gallery()
         # if the gallery didn't turn up a center image, then don't pass center
         center_size = center_size if gallery.center else 0
+
         height,width,width2,center_size = self._best_fit(gallery.size,aspect,center_size=center_size)
 
-        # add dimensions to the printer
+        # add dimensions to the CS
         matrix = (height,width) if width2 == 0 else (height,width,width2)
         self.coordinate_matrix = self.coordinate_system.make_matrix(matrix)
-        ##self.printer.add_matrix(matrix)
-        ##self.coordinate_matrix = self.project.coordinate_matrix
 
         n_total = self.coordinate_matrix.n_total()
         center_total = self.coordinate_matrix.ring_size(width=center_size)
         used = int(n_total - center_total + (center_size>0))
         print(' ...using {} of {} images for {}x{} grid'.format(used,gallery.size,height,max(width,width2)))
         
-        self.grid = Grid(height,width,width2,distance_weight=distance_weight,angle_weight=angle_weight,
+        self.grid = Grid(height,width,width2,distance_weight=self.project.distance_weight,
+                         angle_weight=self.project.angle_weight,dark_weight=self.project.dark_weight,
                          coordinate_system=self.coordinate_system)
         self.grid.add_center(center_size=center_size)
         self.grid.add_from_gallery(gallery)
@@ -90,6 +90,7 @@ class Assembler(Engine):
         # no center size given or center size added to n_pics for recursion
         else:
             if aspect:
+                aspect = self.coordinate_system.convert_aspect(aspect)
                 aspect_ratio = aspect[0]/aspect[1]
                 # square aspect ratio
                 # only way that works is square root
@@ -108,7 +109,7 @@ class Assembler(Engine):
                     deviations_up = abs(aspect_ratio - height_up/width_up)
 
                     if odd is not None:
-                        if width_down%2 == odd:
+                        if width_down%2+1 == odd:
                             height,width = height_down,width_down
                         else:
                             height,width = height_up,width_up

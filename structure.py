@@ -12,7 +12,7 @@ import os
 class Project:
     # read in inputs.txt and create variables
     def __init__(self,inputs_file='inputs.txt',
-                 debugging=False,angle_weight=0.2,distance_weight=0.3,print_after=1000,secondary_scale=1/3):
+                 debugging=False,angle_weight=2,distance_weight=3,dark_weight=1,difference_weight=6,print_after=1000,secondary_scale=1/3):
 
         tweak_split = '='
         parameters = {}
@@ -44,7 +44,11 @@ class Project:
         self.grid_dimension = parameters.get('grid_dimension')
         self.grid_shape = parameters.get('grid_shape')
 
-        aspects = {'iphonex':(19.5,9),'iphone':(16,9),'square':(1,1),'golden':(1,1.618)}
+        aspects = {'iphonex':(19.5,9),
+                   'iphone':(16,9),
+                   'square':(1,1),
+                   'golden':(1,1.618),
+                   'story':(1921,1080)}
         self.grid_aspect = aspects.get(parameters.get('grid_aspect'),parameters.get('grid_aspect'))
         self.grid_aspect_force = parameters.get('grid_aspect_force')
         
@@ -63,8 +67,11 @@ class Project:
 
         # how refined should the process be?
         self.trials = parameters.get('trials')
-        self.angle_weight = 0.2
-        self.distance_weight = 0.3
+
+        weights = sum([angle_weight,distance_weight,dark_weight,difference_weight])
+        self.angle_weight = angle_weight/weights
+        self.distance_weight = distance_weight/weights
+        self.dark_weight = dark_weight/weights
         
         # should the intermediate steps be saved?
         self.print_after = print_after
@@ -73,6 +80,7 @@ class Project:
         # special mode
         self.debugging = debugging
         self.parameters = parameters
+        self.runs = range(parameters.get('runs',1))
 
         # project specific
         self.project_path = '{}/{}'.format(self.path,self.out_folder)

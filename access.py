@@ -2,6 +2,7 @@ import requests
 #import datetime
 import filecmp
 import os
+import io
 from common import *
 
 class IGAuthentications:
@@ -91,22 +92,25 @@ class IGAccount:
             if ok:
                 max_id = jason['data'][-1]['id']
                 for j in jason['data']:
-                    media = ''
-
-                    for m in ['carousel_media','videos','images']:
-                        if m in j:
-                            media = m
+                    media = self._get_media_type(j)
                     self._get_image_urls(j[media],j['id'],media)
             
         return max_id,ok
 
+    def _get_media_type(self,data):
+        # returns if data is a carousel post or videos or images
+        m = ''
+        for m in ['carousel_media','videos','images']:
+            if m in data:
+                media = m
+                break
+        return media
+
     def _get_image_urls(self,data,id,media):
         if media == 'carousel_media':
-            for c in data[media]:
-                for m in ['videos','images']:
-                    if m in c:
-                        media = m
-                self._get_image_urls(self,c,id,media)
+            for c in data:
+                media = self._get_media_type(c)
+                self._get_image_urls(c[media],id,media)
         else:
             if id in self.urls[media]:
                 n = len([u for u in self.urls[media] if '{}_'.format(id) in u]) + 1
@@ -169,6 +173,7 @@ class IGDownloader:
 
                     # if file is a video, check if it has already been downloaded
                     save_file = True
+
                     if collect_videos & (media == 'videos'):
                         save_file = self._compare_files(r.content,videos)
 

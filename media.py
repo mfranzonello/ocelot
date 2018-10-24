@@ -347,6 +347,7 @@ class Picture:
         self.secondary = secondary
         self.greyscale = greyscale
         self.angle = self.color.angle
+        self.dark = 0
         self.target = None
 
     def __repr__(self):
@@ -440,13 +441,8 @@ class Gallery:
         dark = color.is_dark()
         if dark:
             S = 1
-
-        ##x,y = self.CS.from_polar(R*s*(2-V)**2,H)
-        ##x = max(0,x+0.5)
-        ##y = max(0,y+0.5)
-        
+      
         return R,H,dark
-        ##return (x,y),dark,H
 
     def cycle_list(self,values,n):
         # return every nth element to distribute evenly
@@ -472,8 +468,9 @@ class Gallery:
             R,H,dark = self.get_hsv_corner(picture.color,angle=self.angle,hues=hues)
             self.corners[picture.id] = (R,H)
 
-            ##self.corners[picture.id],dark,H = self.get_hsv_corner(picture.color,angle=self.angle,hues=hues)
             self.pictures[self.pictures.index(picture)].angle = H
+            self.pictures[self.pictures.index(picture)].dark = dark
+
             # order pictures based on darkness
             if dark:
                 sorted_dark.append(picture)
@@ -496,28 +493,51 @@ class Gallery:
 
 class Shaper:
     # manipulations to an image
-    def shape(image:Image,shape):
-        # cut an image to a shape
+    def _cut(shape,size=1,dim=1):
+        # return a pattern for a shape
         ratios = {'hexagon':math.sqrt(3)/2,
                   'circle':1}
+        ratio = ratios[shape]
+
+        if shape == 'circle':
+            pattern = [0,0,1,1]
+        elif shape == 'hexagon':
+            resize = 2*size-1
+            srange = range(3*size)
+
+            pieces = [([(0.5,0),(0.5,0.5)][i>2*size][i%2],[(0.25,0.5),(0.25,-0.25)][i>2*size][i%2]) for i in srange]
+
+            positions = [(-size,-0.5)]
+
+            # set up pattern for NE
+            for p in range(len(pieces)):
+                position = positions[-1][0] + pieces[p][0], positions[-1][1] + pieces[p][1]
+                positions.append(position)
+
+            positions = [(positions[1][0],0)] + positions[2:] # delete adjust starting
+
+            positionsNE = [(p[0]/resize,p[1]/resize) for p in positions]
+
+            # set up pattern for SE
+            positionsSE = [(-positionsNE[-i-1][0],positionsNE[-i-1][1]) for i in srange]
+            # set up pattern for SW
+            positionsSW = [(-positionsNE[i][0],-positionsNE[i][1]) for i in srange]
+            # set up pattern for NW
+            positionsNW = [(positionsNE[-i-1][0],-positionsNE[-i-1][1]) for i in srange]
+
+            # combine positions into pattern
+            template = positionsNE[:-1] + positionsSE[:-1] + positionsSW[:-1] + positionsNW
+
+        pattern = [(round((p[0]+0.5)*dim*ratio),
+                    round((p[1]+0.5)*dim)) for p in template]
+    
+        return pattern,ratio
+
+    def shape(image:Image,shape,size=1):
+        # cut an image to a shape
         w,h = image.size
         dim = min(w,h)
-        ratio = ratios[shape]
-        if h != w:
-            m = min(h,w)/2
-            image = image.crop((int(w/2-ratio*m),int(h/2-m),int(w/2+ratio*m),int(h/2+m)))
-        
-        dim1 = int(dim)
-        dim2 = int(dim*ratio)
-
-        patterns = {'hexagon':[(0,round(dim1/4)),
-                               (0,round(3*dim1/4)),
-                               (round(dim2/2),dim1),
-                               (dim2,round(3*dim1/4)),
-                               (dim2,round(dim1/4)),
-                               (round(dim2/2),0)],
-                    'circle':[0,0,dim1,dim1]}
-        pattern = patterns[shape]
+        pattern,ratio = Shaper._cut(shape,size,dim)
 
         # convert to numpy and create mask
         imArray = numpy.asarray(image.convert('RGBA'))

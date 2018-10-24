@@ -2,7 +2,7 @@
 from sorting import *
 #from inputs import *
 
-print('*** OCELOT V2.7 ***\n')
+print('*** OCELOT V2.9 ***\n')
 
 # assemble folders
 project = Project()
@@ -24,25 +24,26 @@ printer = Printer(collector,name=project.grid_name,dimension=project.grid_dimens
                   target_aspect=project.grid_aspect if (project.grid_aspect is not None) & project.grid_aspect_force else None,
                   debugging=project.debugging)
 
-# assemble photos
-assembler = Assembler(collector,printer,name=project.grid_name,aspect=project.grid_aspect,center_size=project.profile_size,
-                      secondary_scale=project.secondary_scale,
-                      distance_weight=project.distance_weight,angle_weight=project.angle_weight,print_gif=project.grid_gif)
-project.add_result('initial',assembler.get_strength())
+for run in project.runs:
+    # assemble photos
+    assembler = Assembler(collector,printer,name=project.grid_name,aspect=project.grid_aspect,center_size=project.profile_size,
+                          secondary_scale=project.secondary_scale,
+                          print_gif=project.grid_gif)
+    project.add_result('initial',assembler.get_strength())
 
-# seed by color
-sorter = Sorter(assembler,print_after=project.print_after)
-sorter.reseed()
-project.add_result('reseed',sorter.get_strength())
+    # seed by color
+    sorter = Sorter(assembler,print_after=project.print_after)
+    sorter.reseed()
+    project.add_result('reseed',sorter.get_strength())
 
-# improve assembly
-sorter.swap_worst(trials=project.trials)
-sorter.finalize()
-project.add_result('iterations',sorter.n_trials)
-project.add_result('final',sorter.get_strength())
+    # improve assembly
+    sorter.swap_worst(trials=project.trials)
+    sorter.finalize()
+    project.add_result('iterations',sorter.n_trials)
+    project.add_result('final',sorter.get_strength())
 
-# finish and print
-printer.finalize()
+    # finish and print
+    printer.finalize()
 
-# summarize results
-project.summarize()
+    # summarize results
+    project.summarize()
