@@ -12,7 +12,8 @@ import os
 class Project:
     # read in inputs.txt and create variables
     def __init__(self,inputs_file='inputs.txt',
-                 debugging=False,angle_weight=2,distance_weight=3,dark_weight=1,difference_weight=6,print_after=1000,secondary_scale=1/3):
+                 debugging=False,difference_weight=6,angle_weight=2,distance_weight=3,dark_weight=1,frame_weight=1,
+                 print_after=1000,secondary_scale=1/3):
 
         tweak_split = '='
         parameters = {}
@@ -48,7 +49,8 @@ class Project:
                    'iphone':(16,9),
                    'square':(1,1),
                    'golden':(1,1.618),
-                   'story':(1921,1080)}
+                   'story':(1921,1080),
+                   'iphonehex':(49,28)}
         self.grid_aspect = aspects.get(parameters.get('grid_aspect'),parameters.get('grid_aspect'))
         self.grid_aspect_force = parameters.get('grid_aspect_force')
         
@@ -68,11 +70,14 @@ class Project:
         # how refined should the process be?
         self.trials = parameters.get('trials')
 
-        weights = sum([angle_weight,distance_weight,dark_weight,difference_weight])
-        self.angle_weight = angle_weight/weights
-        self.distance_weight = distance_weight/weights
-        self.dark_weight = dark_weight/weights
-        
+        self.weights = {'difference': difference_weight,
+                        'angle':angle_weight,
+                        'distance':distance_weight,
+                        'dark':dark_weight,
+                        'frame':frame_weight}
+        total_weights = sum([self.weights[weight] for weight in self.weights if self.weights[weight] is not None])
+        self.weights = {weight:(self.weights[weight]/total_weights) for weight in self.weights if self.weights[weight] is not None}
+
         # should the intermediate steps be saved?
         self.print_after = print_after
         self.secondary_scale = secondary_scale
@@ -285,7 +290,7 @@ class Collector:
 
 class Printer:
     def __init__(self,collector:Collector,name='',dimension=200,dimension_small=20,
-                 border_scale=0,border_color=(0,0,0),target_aspect=None,debugging=False):
+                 target_aspect=None,debugging=False):
         self.project = collector.project
         self.library = collector.library
         self.libary = collector.library
@@ -293,8 +298,8 @@ class Printer:
         self.name = name
         self.dimension = dimension
         self.dimension_small = dimension_small
-        self.border_scale = border_scale
-        self.border_color = border_color
+        self.border_scale = self.project.grid_border_scale
+        self.border_color = self.project.grid_border_color
 
         self.debugging = debugging
 
@@ -377,7 +382,7 @@ class Printer:
                 y = 0
 
             paste_box = (int(y/2),int(x/2),int(y/2)+final_image.width,int(x/2)+final_image.height)
-            image_save = Image.new('RGB',(final_image.width+y,final_image.height+x))
+            image_save = Image.new('RGB',(final_image.width+y,final_image.height+x),color=self.border_color)
             
             image_save.paste(final_image,paste_box)
         else:

@@ -52,8 +52,7 @@ class Assembler(Engine):
         used = int(n_total - center_total + (center_size>0))
         print(' ...using {} of {} images for {}x{} grid'.format(used,gallery.size,height,max(width,width2)))
         
-        self.grid = Grid(height,width,width2,distance_weight=self.project.distance_weight,
-                         angle_weight=self.project.angle_weight,dark_weight=self.project.dark_weight,
+        self.grid = Grid(height,width,width2,weights=self.project.weights,
                          coordinate_system=self.coordinate_system)
         self.grid.add_center(center_size=center_size)
         self.grid.add_from_gallery(gallery)
@@ -235,3 +234,8 @@ class Sorter(Engine):
             spaces = ' '*(len(improve_text)+len('100.0%'))
             improvement = ''
         print(' Trial {}{}'.format(n,improvement,spaces),end='\r')
+
+class Swapper(Engine):
+    # make manual changes
+    def __init__(self,sorter=Sorter):
+        Engine.__init__(sorter.printer)

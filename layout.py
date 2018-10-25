@@ -24,8 +24,7 @@ class Cell:
 class Grid:
     # collection of cells with bridges and tautness
     # tautness: the sum of strengths across all bridges
-    def __init__(self,height:int,width:int=0,width2:int=0,angle=False,
-                 distance_weight=0,angle_weight=0,dark_weight=0,
+    def __init__(self,height:int,width:int=0,width2:int=0,angle=False,weights={},
                  coordinate_system=CoordinateSystem()):
         if width == 0:
             width = height
@@ -41,9 +40,10 @@ class Grid:
 
         self.angle = angle
 
-        self.distance_weight = distance_weight
-        self.angle_weight = angle_weight
-        self.dark_weight = dark_weight
+        self.distance_weight = weights.get('distance')
+        self.angle_weight = weights.get('angle')
+        self.dark_weight = weights.get('dark')
+        self.frame_weight = weights.get('frame')
 
         self.CS = coordinate_system
         self.CSM = CoordinateSystem(self.CS.lattice,self.dimensions)
@@ -169,7 +169,7 @@ class Grid:
         gallery = self.send_to_gallery()
         
         gallery.order_pictures()
-        grid = Grid(self.height,self.width,self.width2,distance_weight=self.distance_weight,angle_weight=self.angle_weight,dark_weight=self.dark_weight,
+        grid = Grid(self.height,self.width,self.width2,weights=self.weights,
                     coordinate_system=self.CS)
         grid.blocked = self.blocked 
         grid.center = self.center
@@ -220,10 +220,11 @@ class Grid:
     def add_cell_strength(self,cell):
         # recalculate strength metric based on bridges
         x0,y0 = cell.position
+        neighbors = [neighbor for neighbor in cell.neighbors if neighbor not in self.blocked]
 
         # account for placement distance
-        if (self.distance_weight > 0):
-            distance_weight = self.distance_weight
+        if (self.weights['distance'] > 0):
+            distance_weight = self.weights['distance']
             if cell.picture.target is not None:
                 R,theta = cell.picture.target
                 x1,y1 = self.CSM.polar_to_matrix(R,theta)
@@ -237,10 +238,10 @@ class Grid:
             distance_strength = 0
 
         # account for placement angle
-        if self.angle_weight > 0:
+        if self.weights['angle'] > 0:
             if cell.picture.angle is not None:
                 angle = cell.picture.angle
-                angle_weight = self.angle_weight
+                angle_weight = self.weights['angle']
                 current_angle = math.atan2(y0-self.width/2,x0-self.height/2)
                 angle_diff = CoordinateSystem.angle_difference(current_angle,angle+self.angle)
                 angle_strength = angle_weight * angle_diff/(2*math.pi)
@@ -251,8 +252,8 @@ class Grid:
             angle_strength = 0
 
         # account for darkness
-        if self.dark_weight > 0:
-            dark_weight = self.dark_weight
+        if self.weights['dark'] > 0:
+            dark_weight = self.weights['dark']
             if cell.picture.dark:
                 distance_to_edge = self.CSM.path_finder(cell.position,to_edge=True,normalize=True)
             else:
@@ -262,9 +263,19 @@ class Grid:
             dark_weight = 0
             dark_strength = 0
 
+        # account for video frames being next to each other
+        if self.weights['frame'] > 0:
+            frame_weight = self.weights['frame']
+            id = cell.picture.id
+            if Common.extension_in(id,['mp4']) & (len(neighbors)>0):
+                frame_id = id[:id.rfind('_')].lower()
+                frame_strength = sum((neighbor[:neighbor.rfind('_')].lower() == frame_id for neighbor in neighbors))/len(neighbors)
+        else:
+            frame_weight = 0
+            frame_strength = 0
+
         # account for color difference
-        difference_weight = 1 - sum([distance_weight,angle_weight,dark_weight])
-        neighbors = [neighbor for neighbor in cell.neighbors if neighbor not in self.blocked]
+        difference_weight = 1 - sum([distance_weight,angle_weight,dark_weight,frame_weight])
 
         if len(neighbors):
             differences = [(cell.picture.difference(self.cells[neighbor].picture))**2 for neighbor in neighbors]
@@ -272,7 +283,7 @@ class Grid:
         else:
             difference_strength = 0
         
-        self.cells[(x0,y0)].strength = difference_strength + distance_strength + angle_strength + dark_strength
+        self.cells[(x0,y0)].strength = difference_strength + distance_strength + angle_strength + dark_strength + frame_strength
 
     def add_cell_strengths(self,region=None):
         # update all cell strengths

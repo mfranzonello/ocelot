@@ -22,7 +22,6 @@ collector.create_gallery(remove_duplicates=project.remove_duplicates,round_color
 
 # set up printer
 printer = Printer(collector,name=project.grid_name,dimension=project.grid_dimension,
-                  border_scale=project.grid_border_scale,border_color=project.grid_border_color,
                   target_aspect=project.grid_aspect if (project.grid_aspect is not None) & project.grid_aspect_force else None,
                   debugging=project.debugging)
 
