@@ -204,7 +204,6 @@ class Finder:
     def _get_photos(self,folder,in_extensions=['jpg','png','bmp','gif'],crop=False):
         # find posted photos, profile or stories
         files = Common.find_files(folder,extensions=in_extensions)
-
         photos = [Photo(fn) for fn in files]
 
         if crop:

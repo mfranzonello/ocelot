@@ -40,10 +40,7 @@ class Grid:
 
         self.angle = angle
 
-        self.distance_weight = weights.get('distance')
-        self.angle_weight = weights.get('angle')
-        self.dark_weight = weights.get('dark')
-        self.frame_weight = weights.get('frame')
+        self.weights = weights
 
         self.CS = coordinate_system
         self.CSM = CoordinateSystem(self.CS.lattice,self.dimensions)
@@ -223,7 +220,7 @@ class Grid:
         neighbors = [neighbor for neighbor in cell.neighbors if neighbor not in self.blocked]
 
         # account for placement distance
-        if (self.weights['distance'] > 0):
+        if (self.weights.get('distance') > 0):
             distance_weight = self.weights['distance']
             if cell.picture.target is not None:
                 R,theta = cell.picture.target
@@ -238,7 +235,7 @@ class Grid:
             distance_strength = 0
 
         # account for placement angle
-        if self.weights['angle'] > 0:
+        if self.weights.get('angle') > 0:
             if cell.picture.angle is not None:
                 angle = cell.picture.angle
                 angle_weight = self.weights['angle']
@@ -252,7 +249,7 @@ class Grid:
             angle_strength = 0
 
         # account for darkness
-        if self.weights['dark'] > 0:
+        if self.weights.get('dark') > 0:
             dark_weight = self.weights['dark']
             if cell.picture.dark:
                 distance_to_edge = self.CSM.path_finder(cell.position,to_edge=True,normalize=True)
@@ -264,12 +261,14 @@ class Grid:
             dark_strength = 0
 
         # account for video frames being next to each other
-        if self.weights['frame'] > 0:
+        if self.weights.get('frame') > 0:
             frame_weight = self.weights['frame']
             id = cell.picture.id
             if Common.extension_in(id,['mp4']) & (len(neighbors)>0):
                 frame_id = id[:id.rfind('_')].lower()
-                frame_strength = sum((neighbor[:neighbor.rfind('_')].lower() == frame_id for neighbor in neighbors))/len(neighbors)
+                frame_strength = sum((frame_id in self.cells[neighbor].picture.id.lower() for neighbor in neighbors))/len(neighbors)
+            else:
+                frame_strength = 0
         else:
             frame_weight = 0
             frame_strength = 0

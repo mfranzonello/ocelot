@@ -27,21 +27,19 @@ printer = Printer(collector,name=project.grid_name,dimension=project.grid_dimens
 
 for run in project.runs:
     # assemble photos
-    assembler = Assembler(collector,printer,name=project.grid_name,aspect=project.grid_aspect,center_size=project.profile_size,
-                          secondary_scale=project.secondary_scale,
-                          print_gif=project.grid_gif)
-    project.add_result('initial',assembler.get_strength())
+    engine = Engine(printer)
+    engine.assemble(collector)
+    project.add_result('initial',engine.get_strength())
 
     # seed by color
-    sorter = Sorter(assembler,print_after=project.print_after)
-    sorter.reseed()
-    project.add_result('reseed',sorter.get_strength())
+    engine.reseed()
+    project.add_result('reseed',engine.get_strength())
 
     # improve assembly
-    sorter.swap_worst(trials=project.trials)
-    sorter.finalize()
-    project.add_result('iterations',sorter.n_trials)
-    project.add_result('final',sorter.get_strength())
+    engine.swap_worst(trials=project.trials)
+    engine.finalize()
+    project.add_result('iterations',engine.n_trials)
+    project.add_result('final',engine.get_strength())
 
     # finish and print
     printer.finalize()
