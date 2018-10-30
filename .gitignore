@@ -10,6 +10,8 @@ testing.py
 *.pyproj
 *.sln
 env/
+ocelot/env/
+ocelot/db.sqlite3
 
 # User-specific files
 *.suo
