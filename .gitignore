@@ -3,15 +3,16 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
-# Testing files
-testing.py
+# Testing + secret files
+/ocelot/ocelittle/testing.py
+/ocelot/ocelittle/secret.py
 
 # VisualStudio files
 *.pyproj
 *.sln
 env/
 ocelot/env/
-ocelot/db.sqlite3
+/ocelot/db.sqlite3
 
 # User-specific files
 *.suo
@@ -339,3 +340,5 @@ ASALocalRun/
 # MFractors (Xamarin productivity tool) working folder 
 .mfractor/
 /ocelot image sorting.sln
+/ocelot/ocelot/ocelittle/secret.py
+/ocelittle/testing.py

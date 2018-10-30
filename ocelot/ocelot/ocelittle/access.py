@@ -3,6 +3,7 @@ import requests
 import filecmp
 import os
 import io
+import secret
 from common import *
 
 class IGAuthentications:
@@ -12,11 +13,11 @@ class IGAuthentications:
     endpoints = {'media': insta_api+insta_media}
 
     # instagram API authentication
-    client_id = 'ba506cf601104c82a1041d633411a772'
-    client_secret = 'bd087ff44cdb455c8fe24a4cbbeb014e'
+    client_id = secret.ig_client_id
+    client_secret = secret.ig_client_secret
 
     # instagram accounts with access
-    access = {'mf_traveler':'6269208265.ba506cf.9ee0d1dc151d4255aae6c368b0f9ff2d'}
+    access = secret.ig_access
 
     def get_endpoint(endpoint):
         return IGAuthentications.endpoints[endpoint]
