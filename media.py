@@ -138,11 +138,6 @@ class Library:
 
         purge_count = len(self.photos) - len(uniques) #len(photos)
         #print('RESIZING1')
-        ##resized = {} # set up for resized images as needed    
-        ##if id not in resized:
-        ##    resized[id] = self.photos[id].resize(dimension)
-        ##compare_image = resized[id]
-
         #images = [print(p) if print(p) is not None else (p,self.photos[p].image.resize(dimensions)) for p in self.photos]
         #print('RESIZING2')
         ##uniques = []

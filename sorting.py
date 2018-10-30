@@ -8,37 +8,40 @@ import copy
 
 class Engine:
     # object that can create or make changes to a grid
-    def __init__(self,printer:Printer):
+    def __init__(self,printer:Printer,print_gif=False):
         self.grid = None
         self.printer = printer
-        self.project = printer.project
-
+        self.print_gif = print_gif
         self.coordinate_system = printer.project.coordinate_system
         self.coordinate_matrix = None
 
-        self.n_trials = 0
-
     def store_grid(self,dimension=50,full=False,extension='jpg'):
-        # add a grid to the print queue
         self.printer.store_grid(self.grid,full=full)
 
+    def get_grid(self):
+        grid = copy.deepcopy(self.grid)
+        return grid
+
     def get_strength(self):
-        # get result of grid strength for summary
         if self.grid is None:
             strength = None
         else:
             strength = self.grid.get_tautness()
         return strength
-        
-    def assemble(self,collector:Collector):
-        # put together images in initial grid layout
+
+class Assembler(Engine):
+    # engine that can assemble a grid from collector specifications
+    def __init__(self,collector:Collector,printer:Printer,name='',aspect=None,center_size=0,
+                 secondary_scale=None,print_gif=True):
+        Engine.__init__(self,printer,print_gif=print_gif)      
         print('Setting up grid...')
-      
+        self.project = collector.project
+
         gallery = collector.get_gallery()
         # if the gallery didn't turn up a center image, then don't pass center
-        center_size = self.project.profile_size if gallery.center else 0
+        center_size = center_size if gallery.center else 0
 
-        height,width,width2,center_size = self._best_fit(gallery.size,self.project.grid_aspect,center_size=center_size)
+        height,width,width2,center_size = self._best_fit(gallery.size,aspect,center_size=center_size)
 
         # add dimensions to the CS
         matrix = (height,width) if width2 == 0 else (height,width,width2)
@@ -54,7 +57,7 @@ class Engine:
         self.grid.add_center(center_size=center_size)
         self.grid.add_from_gallery(gallery)
 
-        if self.project.grid_gif:
+        if self.print_gif:
             self.store_grid(full=True)
             self.store_grid()
 
@@ -65,6 +68,7 @@ class Engine:
 
         width2 = 0
         ## ADD SPECIAL CASE FOR HEXAGONAL COORDINATES WITH WIDTH2 BEING ODD ROWS
+        ## ADJUST ASPECT RATIO TO HEXAGONAL COORDINATES
 
         # if a center size is given, find if even or odd sizing is better
         if center_size > 0:
@@ -139,8 +143,18 @@ class Engine:
 
         return height,width,width2,center_size
 
+class Sorter(Engine):
+    # engine that can improve color matching in a grid
+    def __init__(self,assembler:Assembler,print_after=1000):
+        Engine.__init__(self,assembler.printer,assembler.print_gif)
+        self.project = assembler.project
+
+        self.grid = assembler.get_grid()
+
+        self.n_trials = 0
+        self.print_after = print_after
+
     def reseed(self):
-        # place pictures according to coloring
         print('\nSeeding grid...')
         taut_0 = self.grid.get_tautness()
         grid = self.grid.reseed()
@@ -149,12 +163,11 @@ class Engine:
         taut_1 = self.grid.get_tautness()
         print(' ...{:0.2%} to {:0.2%} strength'.format(taut_0,taut_1))
 
-        if self.project.grid_gif:
+        if self.print_gif:
             self.store_grid()
         return self.grid
 
     def swap_worst(self,threshold=0,trials=1):
-        # swap cells with the worst strength and iterate
         print('\nOptimizing grid...')
         n = 0
         exhausted = False
@@ -187,10 +200,10 @@ class Engine:
                     else:
                         self._update_trial(n)
                         pair += 1
-                        if (n - swap_last >= self.project.print_after) | (pair == len(pairings)):
+                        if (n - swap_last >= self.print_after) | (pair == len(pairings)):
                             exhausted = True
 
-                    if (not n%self.project.print_after) & self.project.grid_gif:
+                    if (not n%self.print_after) & self.print_gif:
                         self.store_grid()
 
                     if n == trials:
@@ -200,7 +213,7 @@ class Engine:
             pass
 
         self.n_trials = n
-        if (n%self.project.print_after) & self.project.grid_gif:
+        if (n%self.print_after) & self.print_gif:
             self.store_grid()
 
         print()
@@ -222,35 +235,7 @@ class Engine:
             improvement = ''
         print(' Trial {}{}'.format(n,improvement,spaces),end='\r')
 
-#    def _swap_cells(self,position1,position2):
-#        # move two cells
-#        print(' Switching cells {} and {}'.format(position1,position2))
-#        self.grid.swap_pictures(position1,position2)
-
-#    def _check_position(self,position):
-#        # check if input is a cell in grid
-#        check = False
-#        if type(position) is tuple:
-#            check = (position in self.grid._safe_cells())
-#        return check
-
-#    def ask_to_swap(self):
-#        # prompt to pick cells to switch
-#        move_on = False
-#        positions = []
-#        while not move_on:
-#            position = input(' Enter {} cell by \'(x,y)\' position (or type \'quit\' to exit): '.format(['first','second'][len(positions)]))
-#            if any(position.lower() == q for q in ['q','quit']):
-#                move_on = True
-#            elif self._check_position(position):
-#                positions.append(position)
-#            if len(positions) == 2:
-#                move_on = True
-#        if len(positions) == 2:
-#            self.swap_cells(positions[0],positions[1])
-
-#    def ask_user(self):
-#        # ask the user to swap cells
-#        move_on = False
-#        while not move_on:
-#            ask = input(' Do you want to swap cells or finish?')
+class Swapper(Engine):
+    # make manual changes
+    def __init__(self,sorter=Sorter):
+        Engine.__init__(sorter.printer)
