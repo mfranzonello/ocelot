@@ -10,7 +10,6 @@
 # VisualStudio files
 *.pyproj
 *.sln
-env/
 ocelot/env/
 /ocelot/db.sqlite3
 
@@ -342,3 +341,4 @@ ASALocalRun/
 /ocelot image sorting.sln
 /ocelot/ocelot/ocelittle/secret.py
 /ocelittle/testing.py
+/env/Lib/site-packages/django/contrib/staticfiles/testing.py
