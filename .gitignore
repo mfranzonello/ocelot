@@ -6,8 +6,10 @@
 # Testing files
 testing.py
 
-# VS project files
+# VisualStudio files
 *.pyproj
+*.sln
+env/
 
 # User-specific files
 *.suo
