@@ -4,8 +4,9 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 # Testing + secret files
-/ocelot/ocelittle/testing.py
-/ocelot/ocelittle/secret.py
+/testing.py
+/secret.py
+/inputs.txt
 
 # VisualStudio files
 *.pyproj
